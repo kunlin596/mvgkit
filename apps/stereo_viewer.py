@@ -31,7 +31,9 @@ class StereoViewer(QtCore.QObject):
         self._load_intrinsics_calibration_files(filenames=intrinsics_calibration_files)
         self._load_stereo_calibration_file(filename=stereo_calibration_file)
 
-    def _load_intrinsics_calibration_files(self, *, filenames: Optional[List[str]] = None):
+    def _load_intrinsics_calibration_files(
+        self, *, filenames: Optional[List[str]] = None
+    ):
         self._calibration_data_0 = None
         self._calibration_data_1 = None
         if filenames is None:
@@ -43,7 +45,10 @@ class StereoViewer(QtCore.QObject):
         with open(filenames[1], "rb") as f:
             self._calibration_data_1 = pickle.load(f)
 
-        if self._calibration_data_0 is not None and self._calibration_data_1 is not None:
+        if (
+            self._calibration_data_0 is not None
+            and self._calibration_data_1 is not None
+        ):
             self._undistort_checkbox.setEnabled(True)
 
     def _load_stereo_calibration_file(self, *, filename: Optional[str] = None):
@@ -66,9 +71,13 @@ class StereoViewer(QtCore.QObject):
         self._window = loader.load(ui_file)
         ui_file.close()
 
-        self._camera0_list = self._window.findChild(QtWidgets.QComboBox, "camera0_combobox")
+        self._camera0_list = self._window.findChild(
+            QtWidgets.QComboBox, "camera0_combobox"
+        )
         assert self._camera0_list is not None
-        self._camera1_list = self._window.findChild(QtWidgets.QComboBox, "camera1_combobox")
+        self._camera1_list = self._window.findChild(
+            QtWidgets.QComboBox, "camera1_combobox"
+        )
         assert self._camera1_list is not None
         self._image0 = self._window.findChild(QtWidgets.QLabel, "camera0_image")
         assert self._image0 is not None
@@ -107,7 +116,9 @@ class StereoViewer(QtCore.QObject):
 
         self._capture_timer = QtCore.QTimer()
 
-        self._undistort_checkbox = self._window.findChild(QtWidgets.QCheckBox, "undistort_checkbox")
+        self._undistort_checkbox = self._window.findChild(
+            QtWidgets.QCheckBox, "undistort_checkbox"
+        )
 
         self._rectification_checkbox = self._window.findChild(
             QtWidgets.QCheckBox, "rectification_checkbox"

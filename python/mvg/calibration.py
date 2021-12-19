@@ -1,12 +1,10 @@
 #!/usr/bin/env python3
-import enum
 import cv2
 import tqdm
 import numpy as np
 import math
-import matplotlib.pyplot as plt
 
-from typing import Optional
+from typing import List, Optional
 from scipy.spatial.transform import Rotation
 from mvg import basic, homography, camera
 from enum import IntEnum
@@ -44,11 +42,25 @@ def compute_reprejection_error(
     object_points: np.ndarray,
     camera_matrix: camera.CameraMatrix,
     camera_pose: basic.SE3,
-    distortion_coeffs: Optional[np.ndarray] = None,
+    radial_distortion_model: Optional[camera.RadialDistortionModel] = None,
 ) -> np.ndarray:
     object_points_C = object_points @ camera_pose.R.as_matrix().T + camera_pose.t
-    reprojected = camera_matrix.project(object_points_C)
+
+    if radial_distortion_model is not None:
+        normalized_image_points = camera_matrix.project_to_normalized_image_plane(
+            points_C=object_points_C
+        )
+        distorted_normalized_image_points = radial_distortion_model.distort(
+            normalized_image_points=normalized_image_points
+        )
+        reprojected = camera_matrix.project_to_sensor_image_plane(
+            normalized_image_points=distorted_normalized_image_points
+        )
+    else:
+        reprojected = camera_matrix.project(object_points_C)
+
     rms = math.sqrt((np.linalg.norm(image_points - reprojected, axis=1) ** 2).mean())
+
     return rms
 
 
@@ -96,7 +108,10 @@ class _ZhangsMethod:
         _, _, vt = np.linalg.svd(V)
         b = vt[-1]
 
+        #
         # Method 1
+        #
+
         B = np.asarray(
             [
                 [b[0], b[1], b[3]],
@@ -109,15 +124,19 @@ class _ZhangsMethod:
         # chol(B) = L @ L.T, where L = K^(-T)
         L = np.linalg.cholesky(B)
         K = np.linalg.inv(L).T
+        K /= K[-1, -1]
 
+        #
         # Method 2
+        #
+
         # Appendix B uses the method below, which is not clear how "without difficult" it is.
         # Cholesky decomposition is more straight forward.
 
-        # denonimator = b[0] * b[2] - b[1] * b[1]
+        # denominator = b[0] * b[2] - b[1] * b[1]
 
-        # u0 = (b[1] * b[4] - b[2] * b[3]) / denonimator
-        # v0 = (b[1] * b[3] - b[0] * b[4]) / denonimator
+        # u0 = (b[1] * b[4] - b[2] * b[3]) / denominator
+        # v0 = (b[1] * b[3] - b[0] * b[4]) / denominator
 
         # lmda = (
         #     b[0] * b[2] * b[5]
@@ -127,9 +146,9 @@ class _ZhangsMethod:
         #     - b[2] * b[3] * b[3]
         # )
 
-        # alpha = math.sqrt(lmda / (denonimator * b[0]))
-        # beta = math.sqrt(lmda / denonimator ** 2 * b[0])
-        # gamma = math.sqrt(lmda / (denonimator ** 2 * b[0])) * b[1]
+        # alpha = math.sqrt(lmda / (denominator * b[0]))
+        # beta = math.sqrt(lmda / denominator ** 2 * b[0])
+        # gamma = math.sqrt(lmda / (denominator ** 2 * b[0])) * b[1]
 
         # K = np.array([[alpha, gamma, u0], [0, beta, v0], [0, 0, 1]])
 
@@ -156,7 +175,56 @@ class _ZhangsMethod:
         return all_poses
 
     @staticmethod
-    def calibrate(all_image_points, object_points, debug=False):
+    def _get_radial_distortion_coeffs(
+        all_image_points: np.ndarray,
+        object_points_W: np.ndarray,
+        intrinsics: np.ndarray,
+        all_extrinsics: List[basic.SE3],
+    ) -> np.ndarray:
+        camera_matrix = camera.CameraMatrix()
+        camera_matrix.from_matrix(intrinsics)
+
+        cx = camera_matrix.cx
+        cy = camera_matrix.cy
+
+        # Eq. 13
+        D = []
+        d = []
+        for i, image_points in enumerate(all_image_points):
+            extrinsics = all_extrinsics[i]
+
+            # xy is the ideal points on normalized image plane
+            xy = basic.homogeneous(object_points_W) @ extrinsics.as_augmented_matrix().T
+
+            # uv is the ideal points in the pixel image plane
+            uv = xy @ camera_matrix.as_matrix().T
+            uv /= uv[:, -1].reshape(-1, 1)
+            uv = uv[:, :2]
+
+            u = uv[:, 0]
+            v = uv[:, 1]
+
+            xy /= xy[:, -1].reshape(-1, 1)
+            xy = xy[:, :2]
+
+            r2 = np.linalg.norm(xy, axis=1) ** 2
+            r4 = r2 ** 2
+
+            D.append([(u - cx) * r2, (u - cx) * r4])
+            D.append([(v - cy) * r2, (v - cy) * r4])
+
+            d.append(image_points[:, 0] - u)
+            d.append(image_points[:, 1] - v)
+
+        D = np.asarray(D).reshape(-1, 2)
+        d = np.asarray(d).reshape(-1, 1)
+
+        k = np.linalg.inv(D.T @ D) @ D.T @ d
+
+        return np.r_[k.T[0], 0.0]
+
+    @staticmethod
+    def calibrate(all_image_points, object_points_W, debug=False):
         """
         Zhengyou Zhang. A flexible new technique for camera calibration.
         Pattern Analysis and Machine Intelligence,
@@ -164,21 +232,33 @@ class _ZhangsMethod:
         """
 
         assert len(all_image_points), "Not enough valid image points!"
-        homographies = _ZhangsMethod._get_homographies(all_image_points, object_points)
+        homographies = _ZhangsMethod._get_homographies(
+            all_image_points, object_points_W
+        )
 
         assert len(homographies) >= 3, "Not enough valid homographies!"
-        intrinsics = _ZhangsMethod._get_intrinsics(homographies)
+        camera_matrix = _ZhangsMethod._get_intrinsics(homographies)
 
         # Extrinsics are per image
-        all_extrinsics = _ZhangsMethod._get_extrinsics(homographies, intrinsics)
+        all_extrinsics = _ZhangsMethod._get_extrinsics(homographies, camera_matrix)
+
+        distortion_coeffs = _ZhangsMethod._get_radial_distortion_coeffs(
+            all_image_points=all_image_points,
+            object_points_W=object_points_W,
+            intrinsics=camera_matrix,
+            all_extrinsics=all_extrinsics,
+        )
+
+        radial_distortion_model = camera.RadialDistortionModel(*distortion_coeffs)
 
         if debug:
             return (
-                intrinsics,
+                camera_matrix,
+                radial_distortion_model,
                 dict(homographies=homographies, all_extrinsics=all_extrinsics),
             )
 
-        return intrinsics
+        return camera_matrix, radial_distortion_model
 
 
 class IntrinsicsCalibration:
@@ -268,7 +348,7 @@ def intrinsic_calibration(*, images, grid_size=0.019):
     #     input()
 
     # embed()
-    return CvIntrinsicsCalibrationData(
+    return IntrisicsCalibrationData(
         camera_matrix=camera_matrix,
         dist=dist,
         rvecs=rvecs,
