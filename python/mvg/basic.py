@@ -1,7 +1,7 @@
 #!/usr/bin/env python3 -B
 """This module includes basic math functions"""
-from typing import List
 import numpy as np
+import sympy as sp
 from scipy.spatial.transform import Rotation
 
 
@@ -69,10 +69,19 @@ class SE3:
         return T
 
     def as_augmented_matrix(self):
-        return np.hstack([self.R.as_matrix(), self.t])
+        return np.hstack([self.R.as_matrix(), self.t.reshape(-1, 1)])
 
     def as_pose(self):
         return np.r_[self.R.as_quat(), self.t]
 
     def __repr__(self) -> str:
         return f"SE3(R={self.R.as_quat()}, t={self.t})"
+
+
+def get_symbolic_rodrigues_rotmat(*, r1: sp.Symbol, r2: sp.Symbol, r3: sp.Symbol):
+    # NOTE: Rodrigues's rotation formula, check more
+    rvec = np.asarray([r1, r2, r3])
+    theta = sp.sqrt(r1 ** 2 + r2 ** 2 + r3 ** 2)
+    rvec /= theta
+    K = sp.Matrix(np.cross(rvec, np.eye(3))).T
+    return sp.eye(3) + sp.sin(theta) * K + (1.0 - sp.cos(theta)) * K @ K

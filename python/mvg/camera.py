@@ -25,16 +25,18 @@ class ProjectionType(IntEnum):
 class RadialDistortionModel:
     """Radial distortion model."""
 
-    k1 = 0.0
-    k2 = 0.0
-    k3 = 0.0
+    k1: float = 0.0
+    k2: float = 0.0
+    k3: float = 0.0
 
-    def distort(self, x, y):
-        r2 = x ** 2 + y ** 2
+    def distort(self, *, normalized_image_points: np.ndarray) -> np.ndarray:
+        x = normalized_image_points[:, 0]
+        y = normalized_image_points[:, 1]
+        r2 = np.linalg.norm(normalized_image_points, axis=1) ** 2
         r4 = r2 ** 2
         r6 = r4 ** 2
         coeff = 1.0 + self.k1 * r2 + self.k2 * r4 + self.k3 * r6
-        return (x * coeff, y * coeff)
+        return np.vstack([x * coeff, y * coeff]).T
 
 
 @dataclass
@@ -44,24 +46,37 @@ class TangentialDistortionModel:
     p1 = 0.0
     p2 = 0.0
 
-    def distort(self, x, y):
-        r2 = x ** 2 + y ** 2
+    def distort(self, normalized_image_points: np.ndarray) -> np.ndarray:
+        r2 = np.linalg.norm(normalized_image_points, axis=1) ** 2
+        x = normalized_image_points[:, 0]
+        y = normalized_image_points[:, 1]
         xy = x * y
-        return (
-            x + (2.0 * self.p1 * xy + self.p2 * (r2 + 2.0 * x ** 2)),
-            y + (2.0 * self.p2 * xy + self.p1 * (r2 + 2.0 * y ** 2)),
-        )
+        return np.vstack(
+            [
+                x + (2.0 * x * xy + y * (r2 + 2.0 * x ** 2)),
+                y + (2.0 * y * xy + x * (r2 + 2.0 * y ** 2)),
+            ]
+        ).T
+
+
+def distort(*, image_points: np.ndarray, distortion_coeffs: np.ndarray) -> np.ndarray:
+    assert (
+        len(distortion_coeffs) == 5
+    ), "Only support distortion coefficients in the format of [k1, k2, k3, p1, p2]!"
+    distorted = RadialDistortionModel(distortion_coeffs[:3]).distort(image_points)
+    distorted = TangentialDistortionModel(distortion_coeffs[3:]).distort(distorted)
+    return distorted
 
 
 @dataclass
 class CameraMatrix:
     """Pinhole camera matrix, by default it's a canonical camera matrix."""
 
-    fx = 1.0  # Focal length (in pixels) in x direction.
-    fy = 1.0  # Focal length (in pixels) in y direction.
-    cx = 0.0  # X offset (in pixels) from optical center in image sensor.
-    cy = 0.0  # Y offset (in pixels) from optical center in image sensor.
-    s = 0.0  # Pixel skew, for rectangular pixel, it should be zero.
+    fx: float = 1.0  # Focal length (in pixels) in x direction.
+    fy: float = 1.0  # Focal length (in pixels) in y direction.
+    cx: float = 0.0  # X offset (in pixels) from optical center in image sensor.
+    cy: float = 0.0  # Y offset (in pixels) from optical center in image sensor.
+    s: float = 0.0  # Pixel skew, for rectangular pixel, it should be zero.
 
     def as_matrix(self) -> np.ndarray:
         return np.asarray(
@@ -101,3 +116,13 @@ class CameraMatrix:
     def unproject(self, image_points: np.ndarray) -> np.ndarray:
         """Unproject points image plane to normalized image plane in 3D."""
         return basic.homogeneous(image_points) @ np.linalg.inv(self.as_matrix()).T
+
+    @staticmethod
+    def project_to_normalized_image_plane(*, points_C):
+        points_C = points_C.copy()
+        points_C[:, :2] /= points_C[:, -1].reshape(-1, 1)
+        return points_C[:, :2]
+
+    def project_to_sensor_image_plane(self, *, normalized_image_points):
+        K = self.as_matrix()
+        return normalized_image_points @ K[:2, :2].T + K[:2, -1]
