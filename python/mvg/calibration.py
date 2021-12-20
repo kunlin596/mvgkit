@@ -344,7 +344,7 @@ def intrinsic_calibration(*, images, grid_size=0.019):
     #     input()
 
     # embed()
-    return IntrisicsCalibrationData(
+    return CvIntrinsicsCalibrationData(
         camera_matrix=camera_matrix,
         dist=dist,
         rvecs=rvecs,

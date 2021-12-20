@@ -11,13 +11,6 @@ from collections import namedtuple
 from dataclasses import dataclass
 
 
-# Pinhole camera intrinsics model in OpenCV format
-IntrisicsCalibrationData = namedtuple(
-    "IntrisicsCalibrationData",
-    ["camera_matrix", "dist", "rvecs", "tvecs", "width", "height"],
-)
-
-
 class ProjectionType(IntEnum):
     kPerspective = 0
     kOrthographic = 1
