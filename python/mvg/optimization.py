@@ -9,9 +9,7 @@ class ProjectionFunctional:
     def _init_rotation_mat(self):
         # NOTE: Rodrigues's rotation formula, check more
         self.r1, self.r2, self.r3 = sp.symbols("r1 r2 r3", real=True)
-        self.rmat = basic.get_symbolic_rodrigues_rotmat(
-            r1=self.r1, r2=self.r2, r3=self.r3
-        )
+        self.rmat = basic.get_symbolic_rodrigues_rotmat(r1=self.r1, r2=self.r2, r3=self.r3)
 
     def _init_translation_vec(self):
         self.t1, self.t2, self.t3 = sp.symbols("t1 t2 t3", real=True)
@@ -23,9 +21,7 @@ class ProjectionFunctional:
         self.cx = sp.Symbol("cx", real=True)
         self.cy = sp.Symbol("cy", real=True)
         self.s = sp.Symbol("s", real=True)
-        self.K = sp.Matrix(
-            [[self.fx, self.s, self.cx], [0.0, self.fy, self.cy], [0.0, 0.0, 1.0]]
-        )
+        self.K = sp.Matrix([[self.fx, self.s, self.cx], [0.0, self.fy, self.cy], [0.0, 0.0, 1.0]])
 
     def __init__(self):
         # Parameters
@@ -92,15 +88,11 @@ class ProjectionFunctional:
             (self.s, camera_matrix.s),
         ]
 
-    def compute_jacobian_value(
-        self, image_point, object_point, camera_matrix, camera_pose
-    ):
+    def compute_jacobian_value(self, image_point, object_point, camera_matrix, camera_pose):
         subs = self._create_subs(image_point, object_point, camera_matrix, camera_pose)
         return self.jac.subs(subs)
 
-    def compute_reprojection_error(
-        self, image_point, object_point, camera_matrix, camera_pose
-    ):
+    def compute_reprojection_error(self, image_point, object_point, camera_matrix, camera_pose):
         subs = self._create_subs(image_point, object_point, camera_matrix, camera_pose)
         return math.sqrt(float(self.functional.subs(subs)[0]))
 

@@ -18,9 +18,7 @@ CvIntrinsicsCalibrationData = namedtuple(
 
 def get_chessboard_object_points(*, rows, cols, grid_size):
     object_points = np.zeros(shape=(cols * rows, 3), dtype=np.float32)
-    object_points[:, :2] = np.transpose(np.mgrid[:cols, :rows], (2, 1, 0)).reshape(
-        -1, 2
-    )
+    object_points[:, :2] = np.transpose(np.mgrid[:cols, :rows], (2, 1, 0)).reshape(-1, 2)
     object_points *= grid_size
     return object_points
 
@@ -232,9 +230,7 @@ class _ZhangsMethod:
         """
 
         assert len(all_image_points), "Not enough valid image points!"
-        homographies = _ZhangsMethod._get_homographies(
-            all_image_points, object_points_W
-        )
+        homographies = _ZhangsMethod._get_homographies(all_image_points, object_points_W)
 
         assert len(homographies) >= 3, "Not enough valid homographies!"
         camera_matrix = _ZhangsMethod._get_intrinsics(homographies)
@@ -387,12 +383,8 @@ def stereo_calibration(
     object_points[:, :2] = np.mgrid[:height, :width].T.reshape(-1, 2)
     object_points *= pattern_grid_size
 
-    camera_matrix_left, roi_left = optimize_camera_matrix(
-        calibration_data=calibration_data_left
-    )
-    camera_matrix_right, roi_right = optimize_camera_matrix(
-        calibration_data=calibration_data_right
-    )
+    camera_matrix_left, roi_left = optimize_camera_matrix(calibration_data=calibration_data_left)
+    camera_matrix_right, roi_right = optimize_camera_matrix(calibration_data=calibration_data_right)
 
     poses = []
 
