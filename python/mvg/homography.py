@@ -52,9 +52,7 @@ class Homography:
         return H
 
     @staticmethod
-    def _refine(
-        *, src: np.ndarray, dst: np.ndarray, initial_H: np.ndarray
-    ) -> np.ndarray:
+    def _refine(*, src: np.ndarray, dst: np.ndarray, initial_H: np.ndarray) -> np.ndarray:
         # TODO: See Multiple View Geometry 4.1, 4.2.
         return initial_H
 

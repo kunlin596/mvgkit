@@ -1,8 +1,10 @@
 #!/usr/bin/env python3 -B
 """This module includes camera models such as a typical pinhole camera model."""
 
+import cv2
 import numpy as np
 import sympy as sp
+from typing import Optional
 from enum import IntEnum
 from mvg import basic
 from collections import namedtuple
@@ -43,8 +45,8 @@ class RadialDistortionModel:
 class TangentialDistortionModel:
     """Tangential distortion model."""
 
-    p1 = 0.0
-    p2 = 0.0
+    p1: float = 0.0
+    p2: float = 0.0
 
     def distort(self, normalized_image_points: np.ndarray) -> np.ndarray:
         r2 = np.linalg.norm(normalized_image_points, axis=1) ** 2
@@ -79,9 +81,7 @@ class CameraMatrix:
     s: float = 0.0  # Pixel skew, for rectangular pixel, it should be zero.
 
     def as_matrix(self) -> np.ndarray:
-        return np.asarray(
-            [[self.fx, self.s, self.cx], [0.0, self.fy, self.cy], [0.0, 0.0, 1.0]]
-        )
+        return np.asarray([[self.fx, self.s, self.cx], [0.0, self.fy, self.cy], [0.0, 0.0, 1.0]])
 
     def as_symbols(self) -> sp.Matrix:
         return sp.Matrix(
@@ -126,3 +126,30 @@ class CameraMatrix:
     def project_to_sensor_image_plane(self, *, normalized_image_points):
         K = self.as_matrix()
         return normalized_image_points @ K[:2, :2].T + K[:2, -1]
+
+
+def undistort(
+    *,
+    image: np.ndarray,
+    camera_matrix: CameraMatrix,
+    radial_distortion_model: Optional[RadialDistortionModel] = None,
+):
+    shape = image.shape
+    undistorted_image_points = np.mgrid[: shape[1], : shape[0]].T
+    undistorted_normalized_points = camera_matrix.unproject(undistorted_image_points.reshape(-1, 2))
+
+    distorted_normalized_points = undistorted_normalized_points
+    if radial_distortion_model is not None:
+        distorted_normalized_points = radial_distortion_model.distort(
+            normalized_image_points=undistorted_normalized_points
+        )
+
+    distorted_image_points = camera_matrix.project_to_sensor_image_plane(
+        normalized_image_points=distorted_normalized_points
+    )
+
+    distorted_image_points_map = distorted_image_points.reshape(shape[0], shape[1], -1)
+    mapx = distorted_image_points_map[:, :, 0].astype(np.float32, copy=False)
+    mapy = distorted_image_points_map[:, :, 1].astype(np.float32, copy=False)
+    undistorted_image = cv2.remap(image, mapx, mapy, cv2.INTER_LINEAR)
+    return undistorted_image
