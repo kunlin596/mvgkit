@@ -23,9 +23,7 @@ def main(*, options):
     for i in range(2):
         print(f"Calibrating intrinsics of camera {i:d}")
         calibration_data = calibration.intrinsic_calibration(images=data[i][::10])
-        with open(
-            filename.parent.absolute() / f"{str(filename):s}.{i:d}.calib", "wb"
-        ) as f:
+        with open(filename.parent.absolute() / f"{str(filename):s}.{i:d}.calib", "wb") as f:
             pickle.dump(calibration_data, f)
     print("Done.")
 
