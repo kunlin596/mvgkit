@@ -1,0 +1,7 @@
+tqdm
+numpy
+scipy
+sympy
+matplotlib
+PySide2
+opencv-python-headless
