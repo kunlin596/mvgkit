@@ -120,6 +120,11 @@ class _ZhangsMethod:
 
         # B = K^(-T) @ K^(-1)
         # chol(B) = L @ L.T, where L = K^(-T)
+
+        # B is symmetric, but not necessarily positive definite, since lambda might be negative.
+        # Invert the sign when not all diagonal elements are positive.
+        if not np.all(np.diag(B) > 0):
+            B = -B
         L = np.linalg.cholesky(B)
         K = np.linalg.inv(L).T
         K /= K[-1, -1]
@@ -291,7 +296,7 @@ def intrinsic_calibration(*, images, grid_size=0.019):
 
     width = images[0].shape[1]
     height = images[0].shape[0]
-    print(f"Calibrating camera, this might take a while...")
+    print("Calibrating camera, this might take a while...")
     ret, camera_matrix, dist, rvecs, tvecs = cv2.calibrateCamera(
         all_object_points, all_image_points, (width, height), None, None
     )
@@ -428,7 +433,8 @@ def stereo_calibration(
     tvecs = np.asarray(tvecs)
 
     print(
-        f"Rotation std: {np.linalg.norm(rvecs, axis=1).std(axis=0):7.3f}(rad), translation std: {np.linalg.norm(tvecs, axis=1).std():7.3f}(m)"
+        f"Rotation std: {np.linalg.norm(rvecs, axis=1).std(axis=0):7.3f}(rad), "
+        f"translation std: {np.linalg.norm(tvecs, axis=1).std():7.3f}(m)"
     )
 
     # fig = plt.figure(0)

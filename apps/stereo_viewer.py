@@ -12,7 +12,7 @@ import cv2
 import pickle
 from typing import List, Optional
 
-from mvg.calibration import CvIntrinsicsCalibrationData, undistort_image
+from mvg.calibration import undistort_image
 
 
 class StereoViewer(QtCore.QObject):

@@ -7,7 +7,6 @@ import sympy as sp
 from typing import Optional
 from enum import IntEnum
 from mvg import basic
-from collections import namedtuple
 from dataclasses import dataclass
 
 
