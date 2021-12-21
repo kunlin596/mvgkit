@@ -6,6 +6,7 @@ import numpy as np
 import sympy as sp
 from typing import Optional
 from enum import IntEnum
+
 from mvg import basic
 from dataclasses import dataclass
 
@@ -31,6 +32,9 @@ class RadialDistortionModel:
         r6 = r4 ** 2
         coeff = 1.0 + self.k1 * r2 + self.k2 * r4 + self.k3 * r6
         return np.vstack([x * coeff, y * coeff]).T
+
+    def as_array(self):
+        return np.asarray([self.k1, self.k2, self.k3])
 
 
 @dataclass
@@ -72,6 +76,9 @@ class CameraMatrix:
     cy: float = 0.0  # Y offset (in pixels) from optical center in image sensor.
     s: float = 0.0  # Pixel skew, for rectangular pixel, it should be zero.
 
+    def as_array(self) -> np.ndarray:
+        return np.array([self.fx, self.fy, self.cx, self.cy, self.s])
+
     def as_matrix(self) -> np.ndarray:
         return np.asarray([[self.fx, self.s, self.cx], [0.0, self.fy, self.cy], [0.0, 0.0, 1.0]])
 
@@ -84,21 +91,15 @@ class CameraMatrix:
             ]
         )
 
-    def from_array(self, array: np.ndarray) -> None:
+    @staticmethod
+    def from_array(array: np.ndarray):
         assert len(array) == 5
-        self.fx = array[0]
-        self.fy = array[1]
-        self.cx = array[2]
-        self.cy = array[3]
-        self.s = array[4]
+        return CameraMatrix(array[0], array[1], array[2], array[3], array[4])
 
-    def from_matrix(self, matrix: np.ndarray) -> None:
+    @staticmethod
+    def from_matrix(matrix: np.ndarray):
         assert matrix.shape == (3, 3)
-        self.fx = matrix[0, 0]
-        self.fy = matrix[1, 1]
-        self.cx = matrix[0, 2]
-        self.cy = matrix[1, 2]
-        self.s = matrix[0, 1]
+        return CameraMatrix(matrix[0, 0], matrix[1, 1], matrix[0, 2], matrix[1, 2], matrix[0, 1])
 
     def project(self, points_C: np.ndarray) -> np.ndarray:
         """Project points in camera frame (C) to image plane"""
@@ -118,6 +119,30 @@ class CameraMatrix:
     def project_to_sensor_image_plane(self, *, normalized_image_points):
         K = self.as_matrix()
         return normalized_image_points @ K[:2, :2].T + K[:2, -1]
+
+
+def project_points(
+    *,
+    object_points: np.ndarray,
+    camera_matrix: CameraMatrix,
+    camera_pose: basic.SE3,
+    radial_distortion_model: Optional[RadialDistortionModel] = None,
+) -> np.ndarray:
+    object_points_C = object_points @ camera_pose.R.as_matrix().T + camera_pose.t
+
+    if radial_distortion_model is not None:
+        normalized_image_points = camera_matrix.project_to_normalized_image_plane(
+            points_C=object_points_C
+        )
+        distorted_normalized_image_points = radial_distortion_model.distort(
+            normalized_image_points=normalized_image_points
+        )
+        projected = camera_matrix.project_to_sensor_image_plane(
+            normalized_image_points=distorted_normalized_image_points
+        )
+    else:
+        projected = camera_matrix.project(object_points_C)
+    return projected
 
 
 def undistort(

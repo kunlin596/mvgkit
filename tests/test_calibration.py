@@ -28,12 +28,10 @@ def _detect_corners(path: Path):
 def _test_calibration_data_set(path: Path, rms_threshold: float):
     all_image_points = _detect_corners(path)
     object_points = get_chessboard_object_points(rows=6, cols=9, grid_size=1.0)
-    intrinsics, radial_distortion_model, debuginfo = IntrinsicsCalibration.calibrate(
+    camera_matrix, radial_distortion_model, debuginfo = IntrinsicsCalibration.calibrate(
         all_image_points, object_points, debug=True
     )
 
-    camera_matrix = camera.CameraMatrix()
-    camera_matrix.from_matrix(intrinsics)
     all_extrinsics = debuginfo["all_extrinsics"]
     for i, image_points in enumerate(all_image_points):
         pose = all_extrinsics[i]
@@ -44,6 +42,7 @@ def _test_calibration_data_set(path: Path, rms_threshold: float):
             camera_pose=pose,
             radial_distortion_model=radial_distortion_model,
         )
+        print(f"reprojection_error={reprojection_error:6.3f}")
         assert abs(reprojection_error) < rms_threshold
 
 
