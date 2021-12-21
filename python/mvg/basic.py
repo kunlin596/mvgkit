@@ -1,5 +1,7 @@
 #!/usr/bin/env python3 -B
 """This module includes basic math functions"""
+from dataclasses import dataclass
+from math import sqrt
 import numpy as np
 import sympy as sp
 from scipy.spatial.transform import Rotation
@@ -24,17 +26,28 @@ def skew_symmetric_matrix(vec):
     return np.cross(vec.reshape(1, -1), np.eye(3, dtype=vec.dtype))
 
 
-class UnitConverter:
+def get_normalization_matrix_2d(points: np.ndarray) -> np.ndarray:
+    """
+    Normalize input data is recommended by the paper below,
+    R. I. Hartley. In defense of the eight-point algorithm. IEEE Trans. Pattern
+    Analysis and Machine Intelligence, 19(6):580–593, 1997.
 
-    METER_TO_MILLIMETER = 1000.0
-    MILLIMETER_TO_METER = 0.001
+    NOTE: that there is a `sqrt(2)` appeared in the nominator but the reason is not clean to me.
+    Perhaps it's just to scale the point down a bit.
 
-    @staticmethod
-    def T_to_meter(T: np.ndarray):
-        assert T.shape == (4, 4)
-        T = T.copy()
-        T[:3, 3] *= UnitConverter.MILLIMETER_TO_METER
-        return T
+    NOTE: More sophisticated method such as PCA could be used to normalization as well.
+    """
+    # Build normalization matrix
+    N = np.eye(3)
+    sqrt_2 = sqrt(2)
+    std_x, std_y = points.std(axis=0)
+    std_x = sqrt_2 / std_x
+    std_y = sqrt_2 / std_y
+    mean_x, mean_y = points.mean(axis=0)
+    N[0, 0] = std_x
+    N[1, 1] = std_y
+    N[:2, 2] = [-std_x * mean_x, -std_y * mean_y]
+    return N
 
 
 def homogeneous_transformation(R: np.ndarray, t: np.ndarray):
@@ -46,21 +59,20 @@ def homogeneous_transformation(R: np.ndarray, t: np.ndarray):
     return T
 
 
+@dataclass
 class SE3:
-    _R: Rotation
-    _t: np.ndarray
+    R: Rotation = Rotation.from_quat([0, 0, 0, 1])
+    t: np.ndarray = np.zeros(3)
 
-    def __init__(self, R: Rotation, t: np.ndarray):
-        self._R = R
-        self._t = t.reshape(-1)
+    @staticmethod
+    def from_quat_pose(pose: np.ndarray):
+        assert len(pose) == 7
+        return SE3(Rotation.from_quat(pose[:4]), pose[4:])
 
-    @property
-    def R(self):
-        return self._R
-
-    @property
-    def t(self):
-        return self._t
+    @staticmethod
+    def from_rotvec_pose(pose: np.ndarray):
+        assert len(pose) == 6
+        return SE3(Rotation.from_rotvec(pose[:3]), pose[3:])
 
     def as_homogeneous_matrix(self):
         T = np.eye(4)
@@ -71,8 +83,11 @@ class SE3:
     def as_augmented_matrix(self):
         return np.hstack([self.R.as_matrix(), self.t.reshape(-1, 1)])
 
-    def as_pose(self):
-        return np.r_[self.R.as_quat(), self.t]
+    def as_quat_pose(self):
+        return np.r_[self.R.as_quat().reshape(-1), self.t.reshape(-1)]
+
+    def as_rotvec_pose(self):
+        return np.r_[self.R.as_rotvec().reshape(-1), self.t.reshape(-1)]
 
     def __repr__(self) -> str:
         return f"SE3(R={self.R.as_quat()}, t={self.t})"

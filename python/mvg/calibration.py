@@ -4,8 +4,9 @@ import tqdm
 import numpy as np
 import math
 
-from typing import List, Optional
+from typing import List, Optional, Tuple
 from scipy.spatial.transform import Rotation
+from scipy.optimize import least_squares
 from mvg import basic, homography, camera
 from enum import IntEnum
 from collections import namedtuple
@@ -42,20 +43,12 @@ def compute_reprejection_error(
     camera_pose: basic.SE3,
     radial_distortion_model: Optional[camera.RadialDistortionModel] = None,
 ) -> np.ndarray:
-    object_points_C = object_points @ camera_pose.R.as_matrix().T + camera_pose.t
-
-    if radial_distortion_model is not None:
-        normalized_image_points = camera_matrix.project_to_normalized_image_plane(
-            points_C=object_points_C
-        )
-        distorted_normalized_image_points = radial_distortion_model.distort(
-            normalized_image_points=normalized_image_points
-        )
-        reprojected = camera_matrix.project_to_sensor_image_plane(
-            normalized_image_points=distorted_normalized_image_points
-        )
-    else:
-        reprojected = camera_matrix.project(object_points_C)
+    reprojected = camera.project_points(
+        object_points=object_points,
+        camera_matrix=camera_matrix,
+        camera_pose=camera_pose,
+        radial_distortion_model=radial_distortion_model,
+    )
 
     rms = math.sqrt((np.linalg.norm(image_points - reprojected, axis=1) ** 2).mean())
 
@@ -155,13 +148,15 @@ class _ZhangsMethod:
 
         # K = np.array([[alpha, gamma, u0], [0, beta, v0], [0, 0, 1]])
 
-        return K
+        return camera.CameraMatrix.from_matrix(K)
 
     @staticmethod
-    def _get_extrinsics(homographies, intrinsics):
+    def _get_extrinsics(
+        homographies: List[np.ndarray], camera_matrix: camera.CameraMatrix
+    ) -> List[basic.SE3]:
         all_poses = []
         # To match the notation in the paper, re-assign some variables
-        A = intrinsics
+        A = camera_matrix.as_matrix()
         A_inv = np.linalg.inv(A)
         for H in homographies:
             h1 = H[:, 0].reshape(3, 1)
@@ -181,11 +176,9 @@ class _ZhangsMethod:
     def _get_radial_distortion_coeffs(
         all_image_points: np.ndarray,
         object_points_W: np.ndarray,
-        intrinsics: np.ndarray,
+        camera_matrix: camera.CameraMatrix,
         all_extrinsics: List[basic.SE3],
     ) -> np.ndarray:
-        camera_matrix = camera.CameraMatrix()
-        camera_matrix.from_matrix(intrinsics)
 
         cx = camera_matrix.cx
         cy = camera_matrix.cy
@@ -194,8 +187,8 @@ class _ZhangsMethod:
         D = []
         d = []
         for i, image_points in enumerate(all_image_points):
-            extrinsics = all_extrinsics[i]
 
+            extrinsics = all_extrinsics[i]
             # xy is the ideal points on normalized image plane
             xy = basic.homogeneous(object_points_W) @ extrinsics.as_augmented_matrix().T
 
@@ -227,6 +220,88 @@ class _ZhangsMethod:
         return np.r_[k.T[0], 0.0]
 
     @staticmethod
+    def _residual(
+        param_array: np.ndarray,
+        all_image_points: np.ndarray,
+        object_points_W: np.ndarray,
+    ):
+        components = _ZhangsMethod._decompose_parameters(
+            param_array=param_array, n_points=len(all_image_points)
+        )
+        camera_matrix = components[0]
+        radial_distortion_model = components[1]
+        all_extrinsics_array = components[2]
+        residuls = []
+        for i in range(len(all_image_points)):
+            image_points = all_image_points[i]
+            camera_pose = basic.SE3.from_rotvec_pose(all_extrinsics_array[i])
+            reprojected = camera.project_points(
+                object_points=object_points_W,
+                camera_matrix=camera_matrix,
+                camera_pose=camera_pose,
+                radial_distortion_model=radial_distortion_model,
+            )
+            residuls.append(image_points - reprojected)
+
+        residuls = np.asarray(residuls).reshape(-1)
+        return residuls
+
+    @staticmethod
+    def _bundle_adjustment(
+        *,
+        camera_matrix: camera.CameraMatrix,
+        radial_distortion_model: camera.RadialDistortionModel,
+        all_extrinsics: List[basic.SE3],
+        all_image_points: np.ndarray,
+        object_points_W: np.ndarray,
+    ) -> Tuple[camera.CameraMatrix, camera.RadialDistortionModel, List[basic.SE3]]:
+
+        x0 = _ZhangsMethod._compose_parameters(
+            camera_matrix=camera_matrix,
+            radial_distortion_model=radial_distortion_model,
+            all_extrinsics=all_extrinsics,
+        )
+
+        result = least_squares(
+            fun=_ZhangsMethod._residual,
+            x0=x0,
+            args=(all_image_points, object_points_W),
+        )
+
+        if not result["success"]:
+            return (camera_matrix, radial_distortion_model, all_extrinsics)
+
+        optimized_x = _ZhangsMethod._decompose_parameters(
+            param_array=result["x"], n_points=len(all_image_points)
+        )
+
+        camera_matrix, radial_distortion_model, all_extrinsics_array = optimized_x
+        all_extrinsics = [
+            basic.SE3.from_rotvec_pose(extrinsics) for extrinsics in all_extrinsics_array
+        ]
+        return (camera_matrix, radial_distortion_model, all_extrinsics)
+
+    @staticmethod
+    def _compose_parameters(
+        *,
+        camera_matrix: camera.CameraMatrix,
+        radial_distortion_model: camera.RadialDistortionModel,
+        all_extrinsics: List[basic.SE3],
+    ):
+        camera_param_array = camera_matrix.as_array()
+        radial_distortion_model_array = radial_distortion_model.as_array()
+        all_extrinsics_array = np.asarray([pose.as_rotvec_pose() for pose in all_extrinsics])
+        all_extrinsics_array = all_extrinsics_array.reshape(-1)
+        return np.r_[camera_param_array, radial_distortion_model_array, all_extrinsics_array]
+
+    @staticmethod
+    def _decompose_parameters(*, param_array: np.ndarray, n_points: int):
+        camera_matrix = camera.CameraMatrix(*param_array[:5])
+        radial_distortion_model = camera.RadialDistortionModel(*param_array[5:8])
+        all_extrinsics_array = param_array[8:].reshape(n_points, 6)
+        return camera_matrix, radial_distortion_model, all_extrinsics_array
+
+    @staticmethod
     def calibrate(all_image_points, object_points_W, debug=False):
         """
         Zhengyou Zhang. A flexible new technique for camera calibration.
@@ -246,11 +321,19 @@ class _ZhangsMethod:
         distortion_coeffs = _ZhangsMethod._get_radial_distortion_coeffs(
             all_image_points=all_image_points,
             object_points_W=object_points_W,
-            intrinsics=camera_matrix,
+            camera_matrix=camera_matrix,
             all_extrinsics=all_extrinsics,
         )
 
         radial_distortion_model = camera.RadialDistortionModel(*distortion_coeffs)
+
+        camera_matrix, radial_distortion_model, all_extrinsics = _ZhangsMethod._bundle_adjustment(
+            camera_matrix=camera_matrix,
+            radial_distortion_model=radial_distortion_model,
+            all_extrinsics=all_extrinsics,
+            all_image_points=all_image_points,
+            object_points_W=object_points_W,
+        )
 
         if debug:
             return (
