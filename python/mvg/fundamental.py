@@ -117,11 +117,15 @@ class Fundamental:
 
     @staticmethod
     def _initialze(*, x: np.ndarray, x2: np.ndarray) -> np.ndarray:
-        F = Fundamental._eigen_analysis(x=x, x2=x2)
+        try:
+            F = Fundamental._eigen_analysis(x=x, x2=x2)
 
-        # This method should yield the same result as the method above
-        # F2 = Fundamental._linear_least_square_eight_point(x=x, x2=x2)
-        # assert np.allclose(F, F2)
+            # This method should yield the same result as the method above
+            # F2 = Fundamental._linear_least_square_eight_point(x=x, x2=x2)
+            # assert np.allclose(F, F2)
+        except Exception as e:
+            print(f"Use eight point due to SVD error: {e}")
+            F = Fundamental._linear_least_square_eight_point(x=x, x2=x2)
 
         return F
 
@@ -144,7 +148,7 @@ class Fundamental:
             )
 
             if not result["success"]:
-                print("Optimization failed!")
+                print("Optimization failed! Use initial F.")
                 return initial_F
 
             F = result["x"].reshape(3, 3)
@@ -152,7 +156,7 @@ class Fundamental:
             return F
 
         except Exception as e:
-            print(f"Optimization failed: {e}")
+            print(f"Optimization failed, use initial F. Error: {e}")
             return initial_F
 
     @staticmethod
@@ -217,21 +221,29 @@ class Fundamental:
         plt.figure()
         plt.subplot(221)
         plt.imshow(image1)
-        plt.scatter(points1[:, 0], points1[:, 1])
+        plt.xlim([0, width])
+        plt.ylim([height, 0])
+        plt.scatter(points1[:, 0], points1[:, 1], color=colors)
         left_lines = Fundamental.get_left_epilines(x2=homogeneous(points2), F=F)
         _plot_line(left_lines)
 
         plt.subplot(222)
         plt.imshow(image2)
+        plt.xlim([0, width])
+        plt.ylim([height, 0])
         plt.scatter(points2[:, 0], points2[:, 1], color=colors)
 
         plt.subplot(223)
         plt.imshow(image1)
+        plt.xlim([0, width])
+        plt.ylim([height, 0])
         plt.scatter(points1[:, 0], points1[:, 1], color=colors)
 
         plt.subplot(224)
         plt.imshow(image2)
-        plt.scatter(points2[:, 0], points2[:, 1])
+        plt.xlim([0, width])
+        plt.ylim([height, 0])
+        plt.scatter(points2[:, 0], points2[:, 1], color=colors)
         right_lines = Fundamental.get_right_epilines(x=homogeneous(points1), F=F)
         _plot_line(right_lines)
         plt.show()

@@ -39,7 +39,7 @@ jobs:
       - name: Lint
         run: |
           # stop the build if there are Python syntax errors or undefined names
-          flake8 python \
+          flake8 python tests scripts\
             --show-source \
             --statistics \
             --ignore=E203,E501 \
@@ -52,6 +52,5 @@ jobs:
         run: |
           sudo ./setup.py install
           python3 -m pytest -q -s \
-            --data-paths ./tests/data/calibration/left \
-                         ./tests/data/calibration/right \
+            --data-root-path ./tests/data \
             -- tests/test_calibration.py

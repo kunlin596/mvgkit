@@ -23,6 +23,24 @@ class ORB:
         return cv2.drawKeypoints(image.copy(), keypoints, None)
 
 
+class SIFT:
+    _detector = None
+
+    def __init__(self):
+        self._detector = cv2.SIFT_create()
+
+    def __call__(self, image: np.ndarray):
+        return self._detector.detectAndCompute(image, None)
+
+    @staticmethod
+    def detect(image: np.ndarray):
+        return SIFT()(image)
+
+    @staticmethod
+    def draw(image: np.ndarray, keypoints: list):
+        return cv2.drawKeypoints(image.copy(), keypoints, None)
+
+
 class Matcher:
     _matcher = None
     _index_params = None
