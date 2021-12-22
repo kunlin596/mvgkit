@@ -266,6 +266,7 @@ class _ZhangsMethod:
             fun=_ZhangsMethod._residual,
             x0=x0,
             args=(all_image_points, object_points_W),
+            loss="huber",
         )
 
         if not result["success"]:
@@ -358,6 +359,19 @@ class IntrinsicsCalibration:
     ):
         if method == IntrinsicsCalibration.Method.kZhangsMethod:
             return _ZhangsMethod.calibrate(image_points, object_points, debug)
+
+
+class StereoCalibration:
+    @staticmethod
+    def calibrate_from_calibrated_camera(
+        image_points_l: np.ndarray,
+        camera_matrix_l: camera.CameraMatrix,
+        radial_distortion_model_l: camera.RadialDistortionModel,
+        image_points_r: np.ndarray,
+        camera_matrix_r: camera.CameraMatrix,
+        radial_distortion_model_r: camera.RadialDistortionModel,
+    ):
+        pass
 
 
 def intrinsic_calibration(*, images, grid_size=0.019):

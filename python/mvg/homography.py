@@ -3,18 +3,17 @@
 import numpy as np
 from scipy.sparse.lil import lil_matrix
 
-from mvg.basic import get_normalization_matrix_2d, homogeneous
+from mvg.basic import get_isotropic_scaling_matrix_2d, homogeneous
 from scipy.optimize import least_squares
 
 
 class Homography:
     @staticmethod
     def compute(*, src: np.ndarray, dst: np.ndarray) -> np.ndarray:
-        """Compute Homography defined in equation x_1 = H @ _0."""
         """Solve H for dst = H @ src"""
         assert len(src) == len(dst)
-        N_src = get_normalization_matrix_2d(src)
-        N_dst = get_normalization_matrix_2d(dst)
+        N_src = get_isotropic_scaling_matrix_2d(src)
+        N_dst = get_isotropic_scaling_matrix_2d(dst)
 
         normalized_src = src @ N_src[:2, :2] + N_src[:2, 2]
         normalized_dst = dst @ N_dst[:2, :2] + N_dst[:2, 2]

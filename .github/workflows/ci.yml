@@ -54,5 +54,4 @@ jobs:
           python3 -m pytest -q -s \
             --data-paths ./tests/data/calibration/left \
                          ./tests/data/calibration/right \
-            --rms-threshold 1.5 \
             -- tests/test_calibration.py
