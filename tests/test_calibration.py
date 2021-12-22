@@ -69,6 +69,8 @@ def test_fundamental_matrix(data_root_path, fundamental_rms_threshold):
     for file1, file2 in zip(
         sorted(os.listdir(caliration_left_path)), sorted(os.listdir(caliration_right_path))
     ):
+        if not file1.endswith('.jpg') or not file2.endswith('.jpg'):
+            continue
         image_left = cv2.imread(str(caliration_left_path / file1))
         image_right = cv2.imread(str(caliration_right_path / file2))
         all_images_left.append(image_left)
@@ -80,7 +82,7 @@ def test_fundamental_matrix(data_root_path, fundamental_rms_threshold):
         points2 = []
         good_matches = []
         for m, n in matches:
-            if m.distance < 0.35 * n.distance:
+            if m.distance < 0.4 * n.distance:
                 good_matches.append(m)
                 points1.append(keypoints1[m.queryIdx].pt)
                 points2.append(keypoints2[m.trainIdx].pt)
@@ -92,22 +94,25 @@ def test_fundamental_matrix(data_root_path, fundamental_rms_threshold):
     all_image_points_r = all_image_points_r
 
     print("\nComputing fundamental matrix and use OpenCV F for performance reference.")
-    for i, (image_points_l, image_points_r) in enumerate(
+    for _, (image_points_l, image_points_r) in enumerate(
         zip(all_image_points_l, all_image_points_r)
     ):
         F = Fundamental.compute(x=image_points_l, x2=image_points_r)
-        rms = Fundamental.compute_rms(F=F, x=image_points_l, x2=image_points_r)
+        rms = Fundamental.compute_geometric_rms(F=F, x=image_points_l, x2=image_points_r)
         F2 = cv2.findFundamentalMat(image_points_l, image_points_r)[0]
-        rms2 = Fundamental.compute_rms(F=F2, x=image_points_l, x2=image_points_r)
+        rms2 = Fundamental.compute_geometric_rms(F=F2, x=image_points_l, x2=image_points_r)
 
-        samples = list(set(np.random.randint(0, len(image_points_l), 10)))
-        Fundamental.plot_epipolar_lines(
-            all_images_left[i],
-            all_images_right[i],
-            image_points_l[samples],
-            image_points_r[samples],
-            F,
+        # samples = list(set(np.random.randint(0, len(image_points_l), 10)))
+        # Fundamental.plot_epipolar_lines(
+        #     all_images_left[i],
+        #     all_images_right[i],
+        #     image_points_l[samples],
+        #     image_points_r[samples],
+        #     F,
+        # )
+
+        print(
+            f"rms={rms:7.3f}, opencv_rms={rms2:7.3f}, {'Won' if rms < rms2 else 'Lost':5s}, "
+            f"F-norm={np.linalg.norm((F - F2)):7.3f}"
         )
-
-        print(f"rms={rms:7.3f}, opencv_rms={rms2:7.3f}, {'Won' if rms < rms2 else 'Lost'}")
         assert rms < fundamental_rms_threshold  # in pixel

@@ -4,7 +4,7 @@
 from math import sqrt
 import numpy as np
 from mvg.basic import get_isotropic_scaling_matrix_2d, homogeneous
-from scipy.optimize import minimize
+from scipy.optimize import least_squares
 
 
 class Fundamental:
@@ -138,13 +138,11 @@ class Fundamental:
         Technical Report RR-2927, INRIA, 1996.
         """
         try:
-            # TODO: Check Nelder-Mead method
-            result = minimize(
-                fun=Fundamental._objective_func,
+            result = least_squares(
+                fun=Fundamental._residual,
                 x0=initial_F.reshape(-1),
                 args=(homogeneous(x), homogeneous(x2)),
-                method="Nelder-Mead",
-                tol=0.1,
+                loss="huber",
             )
 
             if not result["success"]:
@@ -169,21 +167,19 @@ class Fundamental:
 
     @staticmethod
     def _compute_distances_to_epilines(*, x, epilines):
-        """
-        Compute the squared sum of distances of the points
-        to the epipolar lines computed from their corresponding points in another image.
-
-        NOTE: the distances are signed distance, square it to remove the sign.
-        """
-        return (np.sum(epilines * x, axis=1) / np.linalg.norm(epilines[:, :2])) ** 2
+        """Compute the distances of the points to the corresponding epipolar lines."""
+        return np.sum(epilines * x, axis=1) / np.linalg.norm(epilines[:, :2], axis=1)
 
     @staticmethod
-    def _objective_func(f: np.ndarray, x: np.ndarray, x2: np.ndarray):
+    def _residual(f: np.ndarray, x: np.ndarray, x2: np.ndarray):
         F = f.reshape(3, 3)
-        distances1 = Fundamental._compute_distances_to_epilines(x=x, epilines=x2 @ F)
-        distances2 = Fundamental._compute_distances_to_epilines(x=x2, epilines=(F @ x.T).T)
-        rms = sqrt((np.sum(distances1) + np.sum(distances2)) / len(x))
-        return rms
+        distances1 = Fundamental._compute_distances_to_epilines(
+            x=x, epilines=Fundamental.get_left_epilines(x2=x2, F=F)
+        )
+        distances2 = Fundamental._compute_distances_to_epilines(
+            x=x2, epilines=Fundamental.get_right_epilines(x=x, F=F)
+        )
+        return np.r_[distances1, distances2]
 
     @staticmethod
     def _compute_algebraic_residual(F, x, x2):
@@ -193,8 +189,9 @@ class Fundamental:
         return np.diagonal(homogeneous(x2) @ F @ homogeneous(x).T).copy()
 
     @staticmethod
-    def compute_rms(*, F: np.ndarray, x: np.ndarray, x2: np.ndarray):
-        return Fundamental._objective_func(f=F.reshape(-1), x=homogeneous(x), x2=homogeneous(x2))
+    def compute_geometric_rms(*, F: np.ndarray, x: np.ndarray, x2: np.ndarray):
+        distances = Fundamental._residual(F.reshape(-1), homogeneous(x), homogeneous(x2))
+        return sqrt((distances ** 2).mean())
 
     @staticmethod
     def plot_epipolar_lines(

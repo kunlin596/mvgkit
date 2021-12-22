@@ -3,5 +3,7 @@ numpy
 scipy
 sympy
 matplotlib
+pytest
+flake8
 PySide2
 opencv-python-headless
