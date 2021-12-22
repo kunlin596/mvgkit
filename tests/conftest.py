@@ -6,7 +6,7 @@ def pytest_addoption(parser):
     default_path = Path(__file__).parent.absolute() / "data"
     parser.addoption("--data-root-path", action="store", default=default_path, type=str)
     parser.addoption("--intrinsics-rms-threshold", action="store", default=1.5, type=float)
-    parser.addoption("--fundamental-rms-threshold", action="store", default=5.0, type=float)
+    parser.addoption("--fundamental-rms-threshold", action="store", default=30.0, type=float)
 
 
 @pytest.fixture()
