@@ -8,13 +8,13 @@ import numpy as np
 
 from pathlib import Path
 
-from mvg import fundamental
+from mvg import stereo
 from mvg.basic import SE3
 from mvg.camera import CameraMatrix
 
 # from mvg import features
-from mvg.fundamental import Fundamental
-from mvg.fundamental import decompose_essential_matrix
+from mvg.stereo import Fundamental
+from mvg.stereo import decompose_essential_matrix
 
 np.set_printoptions(suppress=True, precision=7, linewidth=120)
 
@@ -135,7 +135,7 @@ def test_essential_matrix_decomposition(data_root_path, points_L, points_R):
     points_3d = None
     for P2 in P2_candidates:
         points_3d_candidates = np.asarray(
-            [fundamental.triangulate(P1, P2, p1, p2) for p1, p2 in zip(points_L, points_R)]
+            [stereo.triangulate(P1, P2, p1, p2) for p1, p2 in zip(points_L, points_R)]
         )
         valid_points_3d = points_3d_candidates[points_3d_candidates[:, 2] > 0]
         if len(valid_points_3d) == len(points_3d_candidates):
