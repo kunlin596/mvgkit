@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""This module implement fundamental and essential matrix related algorithms."""
+"""This module implement stereo vision related algorithms."""
 
 
 import cv2
