@@ -26,8 +26,8 @@ class ORB:
 class SIFT:
     _detector = None
 
-    def __init__(self):
-        self._detector = cv2.SIFT_create()
+    def __init__(self, options: Optional[dict] = None):
+        self._detector = cv2.SIFT_create(nfeatures=10000)
 
     def __call__(self, image: np.ndarray):
         return self._detector.detectAndCompute(image, None)
@@ -75,6 +75,18 @@ class Matcher:
         return Matcher(index_params, search_params)(
             descriptors1.astype(np.float32), descriptors2.astype(np.float32), k
         )
+
+    @staticmethod
+    def get_matched_points(keypoints1, keypoints2, matches, dist_threshold=0.8):
+        points1 = []
+        points2 = []
+        good_matches = []
+        for m, n in matches:
+            if m.distance < dist_threshold * n.distance:
+                good_matches.append(m)
+                points1.append(keypoints1[m.queryIdx].pt)
+                points2.append(keypoints2[m.trainIdx].pt)
+        return np.asarray(points1), np.asarray(points2), good_matches
 
     @staticmethod
     def draw(

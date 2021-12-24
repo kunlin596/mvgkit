@@ -17,15 +17,6 @@ def homogeneous(p: np.ndarray, axis: int = 1, omega: float = 1.0) -> np.ndarray:
             return np.hstack([p, np.ones(shape=(len(p), 1), dtype=p.dtype) * omega])
 
 
-def transform_points(T: np.ndarray, points):
-    assert T.shape == (4, 4)
-    return np.asarray(points) @ T[:3, :3].T + T[:3, 3]
-
-
-def skew_symmetric_matrix(vec):
-    return np.cross(vec.reshape(1, -1), np.eye(3, dtype=vec.dtype))
-
-
 def get_isotropic_scaling_matrix_2d(points: np.ndarray, target_distance=None) -> np.ndarray:
     """
     Scale the points such that they are zero-meaned and the mean distance from origin is `target_distance`.
@@ -70,6 +61,11 @@ def get_nonisotropic_scaling_matrix_2d(points: np.ndarray) -> np.ndarray:
     return N
 
 
+def transform_points(T: np.ndarray, points):
+    assert T.shape == (4, 4)
+    return np.asarray(points) @ T[:3, :3].T + T[:3, 3]
+
+
 def homogeneous_transformation(R: np.ndarray, t: np.ndarray):
     assert R.shape == (3, 3)
     assert len(t) == 3
@@ -94,6 +90,10 @@ class SE3:
         assert len(pose) == 6
         return SE3(Rotation.from_rotvec(pose[:3]), pose[3:])
 
+    @staticmethod
+    def from_rotmat_tvec(rotmat, tvec):
+        return SE3(Rotation.from_matrix(rotmat), tvec)
+
     def as_homogeneous_matrix(self):
         T = np.eye(4)
         T[:3, :3] = self.R.as_matrix()
@@ -113,6 +113,38 @@ class SE3:
         return f"SE3(R={self.R.as_quat()}, t={self.t})"
 
 
+@dataclass
+class SkewSymmetricMatrix3d:
+
+    vec: np.ndarray = np.zeros(3)
+
+    def __post_init__(self):
+        mat = self.as_matrix()
+        assert np.allclose(
+            mat, -mat.T
+        ), "This is not a valid skew symmetric matrix, perhaps it's initialized directly from an invalid matrix!"
+
+    @staticmethod
+    def from_vec(vec):
+        assert len(vec) == 3
+        return SkewSymmetricMatrix3d(np.asarray(vec))
+
+    @staticmethod
+    def from_matrix(mat):
+        assert mat.shape == (3, 3)
+        return SkewSymmetricMatrix3d([mat[2, 1], mat[0, 2], mat[0, 1]])
+
+    def as_vec(self):
+        return np.asarray(self.vec)
+
+    def as_matrix(self):
+        self.vec = np.asarray(self.vec)
+        return np.cross(self.vec.reshape(1, -1), np.eye(3, dtype=self.vec.dtype))
+
+    def T(self):
+        return SkewSymmetricMatrix3d(-self.vec)
+
+
 def get_symbolic_rodrigues_rotmat(*, r1: sp.Symbol, r2: sp.Symbol, r3: sp.Symbol):
     # NOTE: Rodrigues's rotation formula, check more
     rvec = np.asarray([r1, r2, r3])
@@ -125,3 +157,22 @@ def get_symbolic_rodrigues_rotmat(*, r1: sp.Symbol, r2: sp.Symbol, r3: sp.Symbol
 def line_distance_2d(*, points_2d: np.ndarray, line: np.ndarray):
     """Compute the distances of points to line"""
     return homogeneous(points_2d) @ line / np.linalg.norm(line[:2])
+
+
+def normalize_vectors(x, axis=None):
+    x = np.asarray(x)
+    if len(x.shape) == 1:
+        return x / np.linalg.norm(x)
+    else:
+        if axis is None:
+            axis = 1
+        return x / np.linalg.norm(x, axis=axis)
+
+
+def get_line_points_in_image(line: np.ndarray, width: float, height: float):
+    """Compute line points using line in the form of [a, b, c] in the image of shape [height, width]."""
+    assert len(line) == 3
+    x = np.arange(0, width, 0.1)
+    y = (-line[2] - x * line[0]) / line[1]
+    isvalid = (0 <= y) & (y < height)
+    return x[isvalid], y[isvalid]
