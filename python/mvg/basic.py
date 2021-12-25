@@ -132,14 +132,14 @@ class SkewSymmetricMatrix3d:
     @staticmethod
     def from_matrix(mat):
         assert mat.shape == (3, 3)
-        return SkewSymmetricMatrix3d([mat[2, 1], mat[0, 2], mat[0, 1]])
+        return SkewSymmetricMatrix3d([mat[2, 1], mat[0, 2], mat[1, 0]])
 
     def as_vec(self):
         return np.asarray(self.vec)
 
     def as_matrix(self):
         self.vec = np.asarray(self.vec)
-        return np.cross(self.vec.reshape(1, -1), np.eye(3, dtype=self.vec.dtype))
+        return np.cross(self.vec.reshape(1, -1), np.eye(3, dtype=self.vec.dtype)).T
 
     def T(self):
         return SkewSymmetricMatrix3d(-self.vec)
