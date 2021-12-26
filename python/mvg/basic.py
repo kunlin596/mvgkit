@@ -175,4 +175,4 @@ def get_line_points_in_image(line: np.ndarray, width: float, height: float):
     x = np.arange(0, width, 0.1)
     y = (-line[2] - x * line[0]) / line[1]
     isvalid = (0 <= y) & (y < height)
-    return x[isvalid], y[isvalid]
+    return np.vstack([x[isvalid], y[isvalid]]).T

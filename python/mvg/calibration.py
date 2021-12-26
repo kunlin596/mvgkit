@@ -60,9 +60,9 @@ class _ZhangsMethod:
     def _get_homographies(image_points, object_points):
         homographies = []
         for points in image_points:
-            H = homography.Homography.compute(src=object_points[:, :2], dst=points)
+            H = homography.HomographySolver2d.compute(src=object_points[:, :2], dst=points)
             if H is not None:
-                homographies.append(H)
+                homographies.append(H.as_matrix())
         return homographies
 
     @staticmethod
