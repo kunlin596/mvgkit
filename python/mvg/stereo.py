@@ -238,8 +238,8 @@ class Fundamental:
 
         def _plot_line(lines):
             for i, l in enumerate(lines):
-                x, y = basic.get_line_points_in_image(l, width, height)
-                plt.plot(x, y, alpha=0.8, color=colors[i])
+                points = basic.get_line_points_in_image(l, width, height)
+                plt.plot(points[:, 0], points[:, 1], alpha=0.8, color=colors[i])
 
         plt.figure()
 
