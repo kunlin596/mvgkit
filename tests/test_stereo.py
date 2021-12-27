@@ -1,30 +1,40 @@
 #!/usr/bin/env python3
 
 import json
+from dataclasses import dataclass
+from pathlib import Path
+
 from math import sqrt
-from mvg import camera
+from typing import Optional
 from pytest import fixture
 import cv2
 
 import numpy as np
 
-from pathlib import Path
-from dataclasses import dataclass
-
-from mvg import stereo
-from mvg.basic import SE3
-from mvg.camera import CameraMatrix
-
-from mvg import features
-from mvg.stereo import Fundamental
-from mvg.stereo import decompose_essential_matrix
+from mvg.features import SIFT, Matcher
+from mvg.basic import SE3, homogeneous
+from mvg.camera import CameraMatrix, project_points
+from mvg.stereo import AffinityRecoverySolver, Fundamental, decompose_essential_matrix, triangulate
 
 np.set_printoptions(suppress=True, precision=7, linewidth=120)
 
 
+@dataclass
+class StereoDataPack:
+    image_L: np.ndarray
+    image_R: np.ndarray
+    points_L: np.ndarray
+    points_R: np.ndarray
+    camera_matrix: Optional[CameraMatrix] = None
+    manual_points_L: Optional[np.ndarray] = None
+    manual_points_R: Optional[np.ndarray] = None
+    F_RL: Optional[np.ndarray] = None
+    inlier_mask: Optional[np.ndarray] = None
+
+
 @fixture
-def points_L():
-    return np.array(
+def leuven_stereo_data_pack(data_root_path):
+    manual_points_L = np.array(
         [
             [75, 297],
             [101, 304],
@@ -41,10 +51,7 @@ def points_L():
         dtype=np.float32,
     )
 
-
-@fixture
-def points_R():
-    return np.array(
+    manual_points_R = np.array(
         [
             [366, 330],
             [381, 333],
@@ -61,18 +68,6 @@ def points_R():
         dtype=np.float32,
     )
 
-
-@dataclass
-class StereoDataPack:
-    image_L: np.ndarray
-    image_R: np.ndarray
-    points_L: np.ndarray
-    points_R: np.ndarray
-    camera_matrix: CameraMatrix
-
-
-@fixture
-def stereo_data_pack(data_root_path, points_L, points_R):
     fundamental_root_path = Path(data_root_path) / "fundamental"
     with open(fundamental_root_path / "meta.json", "r") as f:
         meta = json.load(f)
@@ -82,38 +77,129 @@ def stereo_data_pack(data_root_path, points_L, points_R):
     image_R = cv2.cvtColor(image_R, cv2.COLOR_BGR2RGB)
     camera_matrix = CameraMatrix.from_matrix(np.reshape(meta["K"], (3, 3)))
 
+    # TODO(kun): after implementing RANSAC point registration, enable auto matching again
+    print("Computing feature points and their matches on left and right images...")
+    keypoints_L, descriptors_L = SIFT.detect(image_L)
+    keypoints_R, descriptors_R = SIFT.detect(image_R)
+    matches = Matcher.match(descriptors1=descriptors_L, descriptors2=descriptors_R)
+    points_L, points_R, _ = Matcher.get_matched_points(
+        keypoints_L, keypoints_R, matches, dist_threshold=0.8
+    )
+
     return StereoDataPack(
         image_L=image_L,
         image_R=image_R,
+        manual_points_L=manual_points_L,
+        manual_points_R=manual_points_R,
         points_L=points_L,
         points_R=points_R,
         camera_matrix=camera_matrix,
     )
 
 
-def test_fundamental_matrix_manual_correspondence(
-    stereo_data_pack: StereoDataPack, fundamental_rms_threshold: float
-):
-    # print("Reading data...")
-    # fundamental_root_path = Path(data_root_path) / "fundamental"
-    # with open(fundamental_root_path / "meta.json", "r") as f:
-    #     meta = json.load(f)
+def _resize(image, ratio=0.5):
+    return cv2.resize(image, (int(image.shape[1] * ratio), int(image.shape[0] * ratio)))
 
-    # image_L = cv2.imread(str(fundamental_root_path / meta["left"]))
-    # image_R = cv2.imread(str(fundamental_root_path / meta["right"]))
-    # camera_matrix = CameraMatrix.from_matrix(np.reshape(meta["K"], (3, 3)))
+
+@fixture
+def aloe_stereo_data_pack(data_root_path):
+    root_path = Path(data_root_path) / "stereo" / "aloe"
+    with open(root_path / "meta.json", "r") as f:
+        meta = json.load(f)
+    image_L = cv2.imread(str(root_path / meta["left"]))
+    image_L = cv2.cvtColor(image_L, cv2.COLOR_BGR2RGB)
+    image_L = _resize(image_L)
+    image_R = cv2.imread(str(root_path / meta["right"]))
+    image_R = cv2.cvtColor(image_R, cv2.COLOR_BGR2RGB)
+    image_R = _resize(image_R)
 
     # TODO(kun): after implementing RANSAC point registration, enable auto matching again
+    print("Computing feature points and their matches on left and right images...")
+    keypoints_L, descriptors_L = SIFT.detect(image_L)
+    keypoints_R, descriptors_R = SIFT.detect(image_R)
+    matches = Matcher.match(descriptors1=descriptors_L, descriptors2=descriptors_R)
+    points_L, points_R, _ = Matcher.get_matched_points(
+        keypoints_L, keypoints_R, matches, dist_threshold=0.3
+    )
+
+    return StereoDataPack(
+        image_L=image_L,
+        image_R=image_R,
+        manual_points_L=None,
+        manual_points_R=None,
+        points_L=points_L,
+        points_R=points_R,
+        camera_matrix=None,
+    )
+
+
+@fixture
+def book_stereo_data_pack(data_root_path):
+    root_path = Path(data_root_path) / "stereo" / "book"
+    with open(root_path / "meta.json", "r") as f:
+        meta = json.load(f)
+    image_L = cv2.imread(str(root_path / meta["left"]))
+    image_L = cv2.cvtColor(image_L, cv2.COLOR_BGR2RGB)
+    image_R = cv2.imread(str(root_path / meta["right"]))
+    image_R = cv2.cvtColor(image_R, cv2.COLOR_BGR2RGB)
+    F_RL = np.asarray(meta["F_RL"])
+    # TODO(kun): after implementing RANSAC point registration, enable auto matching again
     # print("Computing feature points and their matches on left and right images...")
-    # keypoints_L, descriptors_L = features.SIFT.detect(image_L)
-    # keypoints_R, descriptors_R = features.SIFT.detect(image_R)
-    # matches = features.Matcher.match(descriptors1=descriptors_L, descriptors2=descriptors_R)
-    # points_L, points_R, _ = features.Matcher.get_matched_points(
-    #     keypoints_L, keypoints_R, matches, dist_threshold=0.3
+    # keypoints_L, descriptors_L = SIFT.detect(
+    #     image_L,
+    #     options=SIFT.Options(
+    #         num_features=20000,
+    #         num_octave_layers=4,
+    #         contrast_threshold=0.02,
+    #         edge_threshold=7,
+    #         sigma=0.8,
+    #     ),
+    # )
+    # keypoints_R, descriptors_R = SIFT.detect(
+    #     image_R,
+    #     options=SIFT.Options(
+    #         num_features=20000,
+    #         num_octave_layers=4,
+    #         contrast_threshold=0.02,
+    #         edge_threshold=7,
+    #         sigma=0.8,
+    #     ),
     # )
 
-    points_L = stereo_data_pack.points_L
-    points_R = stereo_data_pack.points_R
+    # matches = Matcher.match(descriptors1=descriptors_L, descriptors2=descriptors_R)
+    # points_L, points_R, _ = Matcher.get_matched_points(
+    #     keypoints_L, keypoints_R, matches, dist_threshold=0.6
+    # )
+
+    points_L = np.asarray(meta["points_L"])
+    points_R = np.asarray(meta["points_R"])
+    inlier_mask = np.asarray(meta["inlier_mask"], dtype=bool)
+
+    return StereoDataPack(
+        image_L=image_L,
+        image_R=image_R,
+        manual_points_L=None,
+        manual_points_R=None,
+        points_L=points_L,
+        points_R=points_R,
+        camera_matrix=None,
+        F_RL=F_RL,
+        inlier_mask=inlier_mask,
+    )
+
+
+def _solve_line_intersections(lines):
+    A = lines[:, :2]
+    b = -lines[:, 2]
+    x = np.linalg.inv(A.T @ A) @ A.T @ b
+    return x
+
+
+def test_fundamental_matrix_manual_correspondence(
+    leuven_stereo_data_pack: StereoDataPack, fundamental_rms_threshold: float
+):
+    points_L = leuven_stereo_data_pack.points_L
+    points_R = leuven_stereo_data_pack.points_R
 
     print("Computing fundamental matrix...")
     F_RL, inlier_mask = Fundamental.compute(x_L=points_L, x_R=points_R)
@@ -127,6 +213,16 @@ def test_fundamental_matrix_manual_correspondence(
     Fcv_LR = Fcv_RL.T
 
     rms_cv = Fundamental.compute_geometric_rms(F_RL=Fcv_LR, x_L=points_L, x_R=points_R)
+
+    lines_L = Fundamental.get_epilines_L(x_R=homogeneous(points_R), F_RL=F_RL)
+    assert np.allclose(
+        Fundamental.get_epipole_L(F_RL=F_RL)[:2], _solve_line_intersections(lines_L)
+    ), "Left epipoles from F is not the same as the intersection of all left epilines!"
+
+    lines_R = Fundamental.get_epilines_R(x_L=homogeneous(points_L), F_RL=F_RL)
+    assert np.allclose(
+        Fundamental.get_epipole_R(F_RL=F_RL)[:2], _solve_line_intersections(lines_R)
+    ), "Right epipoles from F is not the same as the intersection of all right epilines!"
 
     print(
         "".join(
@@ -161,7 +257,7 @@ def _get_R_t(R1_RL, R2_RL, t_R, K, points_L, points_R):
     all_inlier_masks = []
 
     for i, P2 in enumerate(P2_candidates):
-        points_3d = stereo.triangulate(P1, P2, points_L, points_R)
+        points_3d = triangulate(P1, P2, points_L, points_R)
 
         inlier_mask = points_3d[:, 2] > 1.0
         num_valid_points = np.count_nonzero(inlier_mask)
@@ -179,20 +275,13 @@ def _get_R_t(R1_RL, R2_RL, t_R, K, points_L, points_R):
 
 
 def test_two_view_reprojection_error(
-    stereo_data_pack: StereoDataPack, stereo_reprojection_rms_threshold: float
+    leuven_stereo_data_pack: StereoDataPack, stereo_reprojection_rms_threshold: float
 ):
-    camera_matrix = stereo_data_pack.camera_matrix
-    image_L = stereo_data_pack.image_L
-    image_R = stereo_data_pack.image_R
-
-    # TODO(kun): after implementing RANSAC point registration, enable auto matching again
-    print("Computing feature points and their matches on left and right images...")
-    keypoints_L, descriptors_L = features.SIFT.detect(image_L)
-    keypoints_R, descriptors_R = features.SIFT.detect(image_R)
-    matches = features.Matcher.match(descriptors1=descriptors_L, descriptors2=descriptors_R)
-    points_L, points_R, _ = features.Matcher.get_matched_points(
-        keypoints_L, keypoints_R, matches, dist_threshold=0.8
-    )
+    camera_matrix = leuven_stereo_data_pack.camera_matrix
+    # image_L = leuven_stereo_data_pack.image_L
+    # image_R = leuven_stereo_data_pack.image_R
+    points_L = leuven_stereo_data_pack.points_L
+    points_R = leuven_stereo_data_pack.points_R
 
     F_RL, inlier_mask = Fundamental.compute(x_L=points_L, x_R=points_R)
     points_inliers_L = points_L[inlier_mask]
@@ -201,15 +290,16 @@ def test_two_view_reprojection_error(
     K = camera_matrix.as_matrix()
     E_RL = K.T @ F_RL @ K
 
+    camera_matrix = leuven_stereo_data_pack.camera_matrix
     R1_RL, R2_RL, t_R = decompose_essential_matrix(E_RL=E_RL)
     T_RL, points_3d, points_3d_inlier_mask, T_RL_candidates, all_inlier_masks = _get_R_t(
         R1_RL, R2_RL, t_R, K, points_inliers_L, points_inliers_R
     )
 
-    reprojected_L = camera.project_points(
+    reprojected_L = project_points(
         object_points_W=points_3d[points_3d_inlier_mask], camera_matrix=camera_matrix
     )
-    reprojected_R = camera.project_points(
+    reprojected_R = project_points(
         object_points_W=points_3d[points_3d_inlier_mask], camera_matrix=camera_matrix, T_CW=T_RL
     )
 
@@ -231,10 +321,10 @@ def test_two_view_reprojection_error(
     #     print(f"Visualizing {i}-th candidate.")
     #     points_3d_inlier_mask = all_inlier_masks[i]
 
-    #     reprojected_L = camera.project_points(
+    #     reprojected_L = project_points(
     #         object_points_W=points_3d[points_3d_inlier_mask], camera_matrix=camera_matrix
     #     )
-    #     reprojected_R = camera.project_points(
+    #     reprojected_R = project_points(
     #         object_points_W=points_3d[points_3d_inlier_mask], camera_matrix=camera_matrix, T_CW=T_RL
     #     )
 
@@ -271,3 +361,32 @@ def test_two_view_reprojection_error(
     threshold = stereo_reprojection_rms_threshold
     assert rms_L < threshold, f"rms_L: {rms_L:7.3f} > {threshold}"
     assert rms_R < threshold, f"rms_R: {rms_R:7.3f} > {threshold}"
+
+
+def test_stereo_rectification(book_stereo_data_pack: StereoDataPack):
+    image_L = book_stereo_data_pack.image_L
+    image_R = book_stereo_data_pack.image_R
+    points_L = book_stereo_data_pack.points_L
+    points_R = book_stereo_data_pack.points_R
+
+    F_RL = book_stereo_data_pack.F_RL
+    inlier_mask = book_stereo_data_pack.inlier_mask
+
+    points_inliers_L = points_L[inlier_mask]
+    points_inliers_R = points_R[inlier_mask]
+
+    H_L, H_R = AffinityRecoverySolver.solve(
+        F_RL=F_RL, image_shape_L=image_L.shape, image_shape_R=image_R.shape
+    )
+
+    lines_L = Fundamental.get_epilines_L(x_R=homogeneous(points_inliers_R), F_RL=F_RL)
+    warped_lines_L = lines_L @ np.linalg.inv(H_L)
+    assert np.allclose(
+        (warped_lines_L[:, 1] / warped_lines_L[:, 0]).ptp(), 0.0
+    ), "Warped lines in left image are not parallel to each other!"
+
+    lines_R = Fundamental.get_epilines_R(x_L=homogeneous(points_inliers_L), F_RL=F_RL)
+    warped_lines_R = lines_R @ np.linalg.inv(H_R)
+    assert np.allclose(
+        (warped_lines_R[:, 1] / warped_lines_R[:, 0]).ptp(), 0.0
+    ), "Wrapped lines in right image are not parallel to each other!"

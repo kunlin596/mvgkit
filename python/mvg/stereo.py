@@ -2,16 +2,22 @@
 """This module implement stereo vision related algorithms."""
 
 
+from dataclasses import dataclass
+from typing import Optional
 import cv2
 from math import pi, sqrt
-from mvg import basic
 
 from scipy.optimize import least_squares
 from scipy.spatial.transform.rotation import Rotation
 
 import numpy as np
 
-from mvg.basic import get_isotropic_scaling_matrix_2d, homogeneous
+from mvg.basic import (
+    SkewSymmetricMatrix3d,
+    get_isotropic_scaling_matrix_2d,
+    homogeneous,
+    get_line_points_in_image,
+)
 
 
 class Fundamental:
@@ -24,20 +30,35 @@ class Fundamental:
     t_LR is the skew symmetric matrix of the translation vector t from frame (L) to (R).
     """
 
+    @dataclass
+    class Options:
+        num_iters: int = 1000
+        atol: float = 0.01
+
     @staticmethod
-    def compute(*, x_L: np.ndarray, x_R: np.ndarray) -> np.ndarray:
-        assert len(x_L) == len(x_R)
+    def compute(
+        *, x_L: np.ndarray, x_R: np.ndarray, options: Optional[Options] = None
+    ) -> np.ndarray:
+        assert len(x_L) == len(x_R) and len(x_L) >= 8
+
+        if options is None:
+            options = Fundamental.Options()
+
+        num_iters = options.num_iters
+        atol = options.atol
 
         N_L = get_isotropic_scaling_matrix_2d(x_L)
         N_R = get_isotropic_scaling_matrix_2d(x_R)
 
-        x_L = homogeneous(x_L)
-        x_R = homogeneous(x_R)
+        hom_x_L = homogeneous(x_L)
+        hom_x_R = homogeneous(x_R)
 
-        normalized_x_L = x_L @ N_L.T
-        normalized_x_R = x_R @ N_R.T
+        normalized_x_L = hom_x_L @ N_L.T
+        normalized_x_R = hom_x_R @ N_R.T
 
-        F_RL, inlier_mask = Fundamental._initialze(x_L=normalized_x_L, x_R=normalized_x_R)
+        F_RL, inlier_mask = Fundamental._initialze(
+            x_L=normalized_x_L, x_R=normalized_x_R, num_iters=num_iters, atol=atol
+        )
         F_RL = Fundamental._optimize(
             x_L=normalized_x_L[inlier_mask], x_R=normalized_x_R[inlier_mask], initial_F_RL=F_RL
         )
@@ -45,6 +66,7 @@ class Fundamental:
         F_RL = N_R.T @ F_RL @ N_L
         F_RL = Fundamental._impose_F_rank(F_RL)
         F_RL /= F_RL[-1, -1]
+
         return F_RL, inlier_mask
 
     @staticmethod
@@ -96,18 +118,18 @@ class Fundamental:
         """
         # Re-write x_L.T @ F @ x_R = 0 to A @ f = 0
         A = np.asarray([np.kron(p_R, p_L) for (p_L, p_R) in zip(x_L, x_R)])
-        _, eigenvectors = np.linalg.eig(A.T @ A)
-        F_RL = eigenvectors[:, -1].reshape(3, 3)
+        _, _, vt = np.linalg.svd(A)
+        F_RL = vt[-1].reshape(3, 3)
         return F_RL
 
     @staticmethod
-    def _ransac_point_registrator(*, x_L: np.ndarray, x_R: np.ndarray, num_iter=1000, atol=0.01):
+    def _ransac_point_registrator(*, x_L: np.ndarray, x_R: np.ndarray, num_iters=1000, atol=0.01):
         i = 0
         max_num_inliers = -1
         best_F_RL = None
         best_inlier_mask = None
         num_points = len(x_L)
-        while i < num_iter:
+        while i < num_iters:
             samples = np.random.randint(0, num_points, 8)
             while len(set(samples)) != len(samples):
                 samples = np.random.randint(0, num_points, 8)
@@ -143,9 +165,12 @@ class Fundamental:
         return F_RL
 
     @staticmethod
-    def _initialze(*, x_L: np.ndarray, x_R: np.ndarray) -> np.ndarray:
+    def _initialze(*, x_L: np.ndarray, x_R: np.ndarray, num_iters: int, atol: float) -> np.ndarray:
         """Initialize a initial F estimation for later optimization."""
-        F_RL, inlier_mask = Fundamental._ransac_point_registrator(x_L=x_L, x_R=x_R)
+        assert len(x_L) >= 8, f"Number of points are is {len(x_L)} less than 8!"
+        F_RL, inlier_mask = Fundamental._ransac_point_registrator(
+            x_L=x_L, x_R=x_R, num_iters=num_iters, atol=atol
+        )
         if F_RL is None:
             print("RANSAC failed! Use all points")
             F_RL = Fundamental._eigen_analysis(x_L=x_L, x_R=x_R)
@@ -164,6 +189,7 @@ class Fundamental:
         Technical Report RR-2927, INRIA, 1996.
         """
         try:
+            print("Optimizing F...")
             result = least_squares(
                 fun=Fundamental._residual,
                 x0=initial_F_RL.reshape(-1),
@@ -189,7 +215,7 @@ class Fundamental:
         eigenvalues, eigenvectors = np.linalg.eig(F_RL)
         epipole_L = eigenvectors[:, eigenvalues.argmin()]
         epipole_L /= epipole_L[-1]
-        return epipole_L
+        return np.real(epipole_L)
 
     @staticmethod
     def get_epipole_R(*, F_RL):
@@ -197,7 +223,7 @@ class Fundamental:
         eigenvalues, eigenvectors = np.linalg.eig(F_RL.T)
         epipole_R = eigenvectors[:, eigenvalues.argmin()]
         epipole_R /= epipole_R[-1]
-        return epipole_R
+        return np.real(epipole_R)
 
     @staticmethod
     def get_epilines_L(*, x_R, F_RL):
@@ -257,7 +283,7 @@ class Fundamental:
 
         def _plot_line(lines):
             for i, l in enumerate(lines):
-                points = basic.get_line_points_in_image(l, width, height)
+                points = get_line_points_in_image(l, width, height)
                 plt.plot(points[:, 0], points[:, 1], alpha=0.8, color=colors[i])
 
         plt.figure()
@@ -359,3 +385,141 @@ def triangulate(P1, P2, points1, points2):
     object_points = cv2.triangulatePoints(P1, P2, points1.T, points2.T).T
     object_points /= object_points[:, -1].reshape(-1, 1)
     return object_points[:, :3]
+
+
+class AffinityRecoverySolver:
+    """This class implement the algorithm for computing affinity recovery homography."""
+
+    @staticmethod
+    def _compute_image_point_matrices(image_shape):
+        # Eq. 11
+        w = image_shape[1]
+        h = image_shape[0]
+
+        PPT = w * h / 12.0 * np.diag([w ** 2 - 1.0, h ** 2 - 1.0, 0.0])
+
+        p_c = np.asarray([(w - 1) / 2, (h - 1) / 2, 1.0]).reshape(-1, 1)
+        ppT = p_c @ p_c.T
+
+        return (PPT, ppT)
+
+    @staticmethod
+    def _compute_initial_guess(A, B):
+        # 5.2
+        L = np.linalg.cholesky(A)
+        D = L.T
+        D_inv = np.linalg.inv(D)
+        eigenvalues, eigenvectors = np.linalg.eig(D_inv.T @ B @ D_inv)
+        y = eigenvectors[:, eigenvalues.argmax()]
+        return D_inv @ y
+
+    @staticmethod
+    def _residual_one_term(z, A, B):
+        return (z.T @ A @ z) / (z.T @ B @ z).reshape(-1)
+
+    @staticmethod
+    def _residual(z, A_L, B_L, A_R, B_R):
+        distortion_L = AffinityRecoverySolver._residual_one_term(z, A_L, B_L)
+        distortion_R = AffinityRecoverySolver._residual_one_term(z, A_R, B_R)
+        return distortion_L + distortion_R
+
+    @staticmethod
+    def _compute_z(A_L, B_L, A_R, B_R):
+        # NOTE: z is 2-vector
+        initial_z_L = AffinityRecoverySolver._compute_initial_guess(A_L, B_L)
+        initial_z_R = AffinityRecoverySolver._compute_initial_guess(A_R, B_R)
+
+        initial_z = np.mean(
+            [
+                initial_z_L / np.linalg.norm(initial_z_L),
+                initial_z_R / np.linalg.norm(initial_z_R),
+            ],
+            axis=0,
+        )
+        # print(f"initial_z_L={initial_z_L}, initial_z_R={initial_z_R}")
+
+        z0 = initial_z / initial_z[-1]
+        result = least_squares(
+            fun=AffinityRecoverySolver._residual,
+            x0=z0,
+            args=(A_L, B_L, A_R, B_R),
+            loss="huber",
+        )
+
+        z = z0
+        if result["success"]:
+            z = result["x"]
+
+        z = np.r_[z, 0.0]
+        return z
+
+    @staticmethod
+    def _solve_one_image(*, F_RL, PPT_L, ppT_L, PPT_R, ppT_R):
+        """Solve the undistortion homography for left image."""
+        epipole_L = Fundamental.get_epipole_L(F_RL=F_RL)
+        epipole_ssm_L = SkewSymmetricMatrix3d.from_vec(epipole_L).as_matrix()
+
+        A_L = (epipole_ssm_L.T @ PPT_L @ epipole_ssm_L)[:2, :2]
+        B_L = (epipole_ssm_L.T @ ppT_L @ epipole_ssm_L)[:2, :2]
+
+        A_R = (F_RL.T @ PPT_R @ F_RL)[:2, :2]
+        B_R = (F_RL.T @ ppT_R @ F_RL)[:2, :2]
+
+        # NOTE: z is 2-vector
+        z = AffinityRecoverySolver._compute_z(A_L, B_L, A_R, B_R)
+
+        w = epipole_ssm_L @ z
+        w /= w[-1]
+
+        H_p = np.eye(3)
+        H_p[-1] = w
+
+        assert np.allclose((H_p @ epipole_L)[-1], 0.0)
+        return H_p
+
+    @staticmethod
+    def solve(*, F_RL, image_shape_L, image_shape_R):
+        """Compute affinity recovery matrix from a image pair.
+
+        This function assumes that the image size is identical and
+        fundamental matrix is known and epipoles are computed as well.
+
+        The minimal information required from image is only the width and height for each image
+
+        The geometric distortion is defined as the distance from the image point
+        to the center of the image,
+
+            sum_{i-1}^n (w_i - w_C)^2 / w_c
+
+        The idea is to measure the distance above for all of the pixels in both images.
+        A key idea is to plug in the epipolar constraints into the objective function,
+        such that we can optimize it accordingly. See derivation of equation 11.
+
+        Once we found a ideal point z which can minimize the predefined distortion error,
+        we can find out the where the epipolar line w at infinity.
+
+        By building up the homography connecting the imaged epipolar line and
+        the "moved" epipolar line we just derived, we can find out the desired homography.
+        """
+
+        PPT_L, ppT_L = AffinityRecoverySolver._compute_image_point_matrices(image_shape_L)
+        PPT_R, ppT_R = AffinityRecoverySolver._compute_image_point_matrices(image_shape_R)
+
+        Hp_L = AffinityRecoverySolver._solve_one_image(
+            F_RL=F_RL, PPT_L=PPT_L, ppT_L=ppT_L, PPT_R=PPT_R, ppT_R=ppT_R
+        )
+
+        Hp_R = AffinityRecoverySolver._solve_one_image(
+            F_RL=F_RL.T, PPT_L=PPT_R, ppT_L=ppT_R, PPT_R=PPT_L, ppT_R=ppT_L
+        )
+
+        return (Hp_L, Hp_R)
+
+
+def compute_rectification_homography(image_L: np.ndarray, image_R: np.ndarray, F_RL: np.ndarray):
+    """
+    Loop, Charles, and Zhengyou Zhang. "Computing rectifying homographies for stereo vision."
+    Proceedings. 1999 IEEE Computer Society Conference on Computer Vision and Pattern Recognition (Cat. No PR00149).
+    Vol. 1. IEEE, 1999.
+    """
+    pass
