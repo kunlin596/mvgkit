@@ -16,9 +16,8 @@ class Homography2d:
     H: np.ndarray
 
     def __post_init__(self):
-        assert self.H.shape == (3, 3), "H must be a 3 x 3 matrix!"
+        Homography2d.ensure_projectivity(self.H)
         self.H /= self.H[-1, -1]
-        assert np.linalg.det(self.H) > 0, "H is not invertible!"
 
     def decompose_SAP(self):
         """Decompose a homography into a chain of transformations.
@@ -62,6 +61,11 @@ class Homography2d:
 
     def as_array(self):
         return self.H.reshape(-1)
+
+    @staticmethod
+    def ensure_projectivity(H: np.ndarray):
+        assert H.shape == (3, 3), "H is not a square 3 x 3 matrix!"
+        assert np.linalg.det(H) > 0, "H is not invertible!"
 
 
 class HomographySolver2d:

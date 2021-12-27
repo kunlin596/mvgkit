@@ -165,6 +165,22 @@ class Fundamental:
             return initial_F_LR
 
     @staticmethod
+    def get_epipole_L(*, F_LR):
+        assert np.allclose(np.linalg.det(F_LR), 0.0)
+        eigenvalues, eigenvectors = np.linalg.eig(F_LR.T)
+        epipole_L = eigenvectors[:, eigenvalues.argmin()]
+        epipole_L /= epipole_L[-1]
+        return epipole_L
+
+    @staticmethod
+    def get_epipole_R(*, F_LR):
+        assert np.allclose(np.linalg.det(F_LR), 0.0)
+        eigenvalues, eigenvectors = np.linalg.eig(F_LR)
+        epipole_R = eigenvectors[:, eigenvalues.argmin()]
+        epipole_R /= epipole_R[-1]
+        return epipole_R
+
+    @staticmethod
     def get_epilines_L(*, x_R, F_LR):
         """
         Get epipolar lines on the left image from the right points.
