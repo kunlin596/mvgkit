@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 """This module includes various common image features."""
+from dataclasses import dataclass
 from typing import List, Optional, Dict
 import cv2
 import numpy as np
@@ -26,19 +27,54 @@ class ORB:
 class SIFT:
     _detector = None
 
-    def __init__(self, options: Optional[dict] = None):
-        self._detector = cv2.SIFT_create(nfeatures=20000)
+    @dataclass
+    class Options:
+        num_features: int = 20000
+        num_octave_layers: Optional[int] = None
+        contrast_threshold: float = 0.04
+        edge_threshold: float = 10
+        sigma: float = 1.6
+
+    def __init__(self, options: Optional[Options] = None):
+        if options is None:
+            options = SIFT.Options()
+
+        self._detector = cv2.SIFT_create(
+            nfeatures=options.num_features,
+            nOctaveLayers=options.num_octave_layers,
+            contrastThreshold=options.contrast_threshold,
+            edgeThreshold=options.edge_threshold,
+            sigma=options.sigma,
+        )
 
     def __call__(self, image: np.ndarray):
         return self._detector.detectAndCompute(image, None)
 
     @staticmethod
-    def detect(image: np.ndarray):
-        return SIFT()(image)
+    def detect(image: np.ndarray, options: Optional[Options] = None):
+        return SIFT(options=options)(image)
 
     @staticmethod
     def draw(image: np.ndarray, keypoints: list):
         return cv2.drawKeypoints(image.copy(), keypoints, None)
+
+
+# class SURF:
+#     _detector = None
+
+#     def __init__(self):
+#         self._detector = cv2.xfeatures2d.SURF_create()
+
+#     def __call__(self, image: np.ndarray):
+#         return self._detector.detectAndCompute(image, None)
+
+#     @staticmethod
+#     def detect(image: np.ndarray):
+#         return SURF()(image)
+
+#     @staticmethod
+#     def draw(image: np.ndarray, keypoints: list):
+#         return cv2.drawKeypoints(image.copy(), keypoints, None)
 
 
 class Matcher:

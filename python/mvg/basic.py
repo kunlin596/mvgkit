@@ -9,6 +9,18 @@ import sympy as sp
 from scipy.spatial.transform import Rotation
 
 
+def get_points_mesh(*, width, height, step_size=1.0) -> np.ndarray:
+    return np.transpose(np.mgrid[:width, :height], (2, 1, 0)).reshape(-1, 2) * step_size
+
+
+def is_single_point_3d(points: np.ndarray):
+    return len(points.reshape(-1)) == 3
+
+
+def is_point_array_3d(points: np.ndarray):
+    return len(points.shape) == 2 and points.shape[-1] == 3
+
+
 def homogeneous(p: np.ndarray, axis: int = 1, omega: float = 1.0) -> np.ndarray:
     if len(p.shape) == 1:
         return np.r_[p, 1.0]
