@@ -7,9 +7,10 @@ import cv2
 import numpy as np
 
 from pathlib import Path
+from dataclasses import dataclass
 
 from mvg import stereo
-from mvg.basic import SE3
+from mvg.basic import SE3, homogeneous
 from mvg.camera import CameraMatrix
 
 # from mvg import features
@@ -59,11 +60,35 @@ def points_R():
     )
 
 
+@dataclass
+class StereoDataPack:
+    image_L: np.ndarray
+    image_R: np.ndarray
+    points_L: np.ndarray
+    points_R: np.ndarray
+    camera_matrix: CameraMatrix
+
+
+@fixture
+def stereo_data_pack(data_root_path, points_L, points_R):
+    fundamental_root_path = Path(data_root_path) / "fundamental"
+    with open(fundamental_root_path / "meta.json", "r") as f:
+        meta = json.load(f)
+    image_L = cv2.imread(str(fundamental_root_path / meta["left"]))
+    image_R = cv2.imread(str(fundamental_root_path / meta["right"]))
+    camera_matrix = CameraMatrix.from_matrix(np.reshape(meta["K"], (3, 3)))
+
+    return StereoDataPack(
+        image_L=image_L,
+        image_R=image_R,
+        points_L=points_L,
+        points_R=points_R,
+        camera_matrix=camera_matrix,
+    )
+
+
 def test_fundamental_matrix_manual_correspondence(
-    data_root_path,
-    points_L,
-    points_R,
-    fundamental_rms_threshold: float,
+    stereo_data_pack: StereoDataPack, fundamental_rms_threshold: float
 ):
     # print("Reading data...")
     # fundamental_root_path = Path(data_root_path) / "fundamental"
@@ -82,6 +107,9 @@ def test_fundamental_matrix_manual_correspondence(
     # points_L, points_R, _ = features.Matcher.get_matched_points(
     #     keypoints_L, keypoints_R, matches, dist_threshold=0.3
     # )
+
+    points_L = stereo_data_pack.points_L
+    points_R = stereo_data_pack.points_R
 
     print("Computing fundamental matrix...")
     F_LR = Fundamental.compute(x_L=points_L, x_R=points_R)
@@ -107,13 +135,46 @@ def test_fundamental_matrix_manual_correspondence(
     assert rms < fundamental_rms_threshold  # in pixel
 
 
-def test_essential_matrix_decomposition(data_root_path, points_L, points_R):
-    print("Reading data...")
-    fundamental_root_path = Path(data_root_path) / "fundamental"
-    with open(fundamental_root_path / "meta.json", "r") as f:
-        meta = json.load(f)
+def _select_R_t(R1_LR, R2_LR, t_LR, K, points_L, points_R):
+    P1 = K @ SE3.from_rotmat_tvec(np.eye(3), np.zeros(3)).as_augmented_matrix()
 
-    camera_matrix = CameraMatrix.from_matrix(np.reshape(meta["K"], (3, 3)))
+    candidates = [
+        SE3.from_rotmat_tvec(R1_LR, t_LR),
+        SE3.from_rotmat_tvec(R1_LR, -t_LR),
+        SE3.from_rotmat_tvec(R2_LR, t_LR),
+        SE3.from_rotmat_tvec(R2_LR, -t_LR),
+    ]
+
+    P2_candidates = [K @ candidate.as_augmented_matrix() for candidate in candidates]
+
+    valid_indices = []
+    for i, P2 in enumerate(P2_candidates):
+        points_3d_candidates = np.asarray(
+            [stereo.triangulate(P1, P2, p1, p2) for p1, p2 in zip(points_L, points_R)]
+        )
+        valid_points_3d = points_3d_candidates[points_3d_candidates[:, 2] > 0]
+        if len(valid_points_3d) == len(points_3d_candidates):
+            valid_indices.append(i)
+
+    return candidates, valid_indices
+
+
+def _test_epipolar_lines_intersection(R_LR, t_LR, epilines_L, epilines_R, camera_matrix):
+    epipole_L = camera_matrix.project([t_LR])[0]
+    epipole_R = camera_matrix.project([-R_LR.as_matrix().T @ t_LR])[0]
+
+    assert (
+        np.sum(epilines_L * np.reshape(np.r_[epipole_L, 1.0], (1, -1))) < 1e-10
+    ), "Left epipole is not on every left epipolar lines!"
+    assert (
+        np.sum(epilines_R * np.reshape(np.r_[epipole_R, 1.0], (1, -1))) < 1e-10
+    ), "Right epipole is not on every right epipolar lines."
+
+
+def test_essential_matrix_decomposition(stereo_data_pack: StereoDataPack):
+    camera_matrix = stereo_data_pack.camera_matrix
+    points_L = stereo_data_pack.points_L
+    points_R = stereo_data_pack.points_R
 
     F_LR = Fundamental.compute(x_L=points_L, x_R=points_R)
 
@@ -124,25 +185,31 @@ def test_essential_matrix_decomposition(data_root_path, points_L, points_R):
     R1_LR, R2_LR, t_LR = decompose_essential_matrix(E_LR=E_LR)
     # R1cv_LR, R2cv_LR, tcv_LR = cv2.decomposeEssentialMat(Ecv_LR)
 
-    P1 = K @ SE3.from_rotmat_tvec(np.eye(3), np.zeros(3)).as_augmented_matrix()
-    P2_candidates = [
-        K @ SE3.from_rotmat_tvec(R1_LR, t_LR).as_augmented_matrix(),
-        K @ SE3.from_rotmat_tvec(R1_LR, -t_LR).as_augmented_matrix(),
-        K @ SE3.from_rotmat_tvec(R2_LR, t_LR).as_augmented_matrix(),
-        K @ SE3.from_rotmat_tvec(R2_LR, -t_LR).as_augmented_matrix(),
-    ]
-
-    points_3d = None
-    for P2 in P2_candidates:
-        points_3d_candidates = np.asarray(
-            [stereo.triangulate(P1, P2, p1, p2) for p1, p2 in zip(points_L, points_R)]
-        )
-        valid_points_3d = points_3d_candidates[points_3d_candidates[:, 2] > 0]
-        if len(valid_points_3d) == len(points_3d_candidates):
-            points_3d = points_3d_candidates
+    T_LR_candidates, valid_indices = _select_R_t(R1_LR, R2_LR, t_LR, K, points_L, points_R)
 
     # TODO(kun): Add precision test
-    assert points_3d is not None
+    assert len(valid_indices) == 1
+
+    T_LR = T_LR_candidates[valid_indices[0]]
+
+    R_LR = T_LR.R
+    t_LR = T_LR.t
+
+    points_L = stereo_data_pack.points_L
+    points_R = stereo_data_pack.points_R
+
+    camera_matrix = stereo_data_pack.camera_matrix
+
+    epilines_L = stereo.Fundamental.get_epilines_L(x_R=homogeneous(points_R), F_LR=F_LR)
+    epilines_R = stereo.Fundamental.get_epilines_R(x_L=homogeneous(points_L), F_LR=F_LR)
+
+    _test_epipolar_lines_intersection(
+        R_LR=R_LR,
+        t_LR=t_LR,
+        epilines_L=epilines_L,
+        epilines_R=epilines_R,
+        camera_matrix=camera_matrix,
+    )
 
     # import matplotlib.pyplot as plt
 
