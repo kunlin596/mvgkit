@@ -15,24 +15,13 @@ from mvg.basic import get_isotropic_scaling_matrix_2d, homogeneous
 
 
 class Fundamental:
-    """This class implements methods for computing fundamental matrix between stereo camera pairs.
+    """This class implements methods for computing fundamental (as well as essential) matrix.
 
-    This implementation is expressing the right frame (R) in left frame (L).
+    The epipolar coplanarity constraint can be expressed as the equations below as
 
-    The constraints can be shown as below,
-
-        F = x_L.T @ inv(K_L).T @ R_LR @ K_R @ x_R
-
-    Here, x_L and x_R are the pixel coordinates in the frame (L) and (R) respectively,
-    and K_L and L_R is the associated camera matrices. R_LR is the orientation of frame (R) expressed in frame (L).
-
-    Also note that the rigid transformation is the pose of second camera expressed in left frame (L).
-
-    For the sake of consistency, fundamental matrix is also adopting this notation
-    denoting the direction of the camera movement.
-
-    Depending on how you model your 3D points
-
+    Here, x_L and x_R are the corresponding pixel coordinates in the frame (L) and (R) respectively,
+    K_L and L_R is the camera matrices. R_LR is the relative orientation of frame (R) expressed in frame (L),
+    t_LR is the skew symmetric matrix of the translation vector t from frame (L) to (R).
     """
 
     @staticmethod
