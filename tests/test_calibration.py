@@ -38,12 +38,12 @@ def _test_calibration_data_set(path: Path, rms_threshold: float):
 
     all_extrinsics = debuginfo["all_extrinsics"]
     for i, image_points in enumerate(all_image_points):
-        pose = all_extrinsics[i]
+        T_CW = all_extrinsics[i]
         reprojection_error = compute_reprejection_error(
             image_points=image_points,
-            object_points=object_points,
+            object_points_W=object_points,
             camera_matrix=camera_matrix,
-            camera_pose=pose,
+            T_CW=T_CW,
             radial_distortion_model=radial_distortion_model,
         )
         print(f"reprojection_error={reprojection_error:6.3f}")

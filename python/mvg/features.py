@@ -27,7 +27,7 @@ class SIFT:
     _detector = None
 
     def __init__(self, options: Optional[dict] = None):
-        self._detector = cv2.SIFT_create(nfeatures=10000)
+        self._detector = cv2.SIFT_create(nfeatures=20000)
 
     def __call__(self, image: np.ndarray):
         return self._detector.detectAndCompute(image, None)
