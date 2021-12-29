@@ -1,7 +1,9 @@
-#!/usr/bin/env python3 -B
+#!/usr/bin/env python3
 """This module includes basic math functions"""
+
 from dataclasses import dataclass
 from math import sqrt
+from typing import Optional
 import numpy as np
 import sympy as sp
 from scipy.spatial.transform import Rotation
@@ -77,8 +79,14 @@ def homogeneous_transformation(R: np.ndarray, t: np.ndarray):
 
 @dataclass
 class SE3:
-    R: Rotation = Rotation.from_quat([0, 0, 0, 1])
-    t: np.ndarray = np.zeros(3)
+    R: Optional[Rotation] = None
+    t: Optional[np.ndarray] = None
+
+    def __post_init__(self):
+        if self.R is None:
+            self.R = Rotation.from_quat([0.0, 0.0, 0.0, 1.0])
+        if self.t is None:
+            self.t = np.array([0.0, 0.0, 0.0])
 
     @staticmethod
     def from_quat_pose(pose: np.ndarray):
@@ -108,6 +116,10 @@ class SE3:
 
     def as_rotvec_pose(self):
         return np.r_[self.R.as_rotvec().reshape(-1), self.t.reshape(-1)]
+
+    def inv(self):
+        R_inv = self.R.inv()
+        return SE3(R_inv, -R_inv.as_matrix() @ self.t)
 
     def __repr__(self) -> str:
         return f"SE3(R={self.R.as_quat()}, t={self.t})"

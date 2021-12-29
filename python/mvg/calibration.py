@@ -38,15 +38,15 @@ def find_corners(*, image, grid_rows, grid_cols):
 def compute_reprejection_error(
     *,
     image_points: np.ndarray,
-    object_points: np.ndarray,
+    object_points_W: np.ndarray,
     camera_matrix: camera.CameraMatrix,
-    camera_pose: basic.SE3,
+    T_CW: basic.SE3,
     radial_distortion_model: Optional[camera.RadialDistortionModel] = None,
 ) -> np.ndarray:
     reprojected = camera.project_points(
-        object_points=object_points,
+        object_points_W=object_points_W,
         camera_matrix=camera_matrix,
-        camera_pose=camera_pose,
+        T_CW=T_CW,
         radial_distortion_model=radial_distortion_model,
     )
 
@@ -234,11 +234,11 @@ class _ZhangsMethod:
         residuls = []
         for i in range(len(all_image_points)):
             image_points = all_image_points[i]
-            camera_pose = basic.SE3.from_rotvec_pose(all_extrinsics_array[i])
+            T_CW = basic.SE3.from_rotvec_pose(all_extrinsics_array[i])
             reprojected = camera.project_points(
-                object_points=object_points_W,
+                object_points_W=object_points_W,
                 camera_matrix=camera_matrix,
-                camera_pose=camera_pose,
+                T_CW=T_CW,
                 radial_distortion_model=radial_distortion_model,
             )
             residuls.append(image_points - reprojected)

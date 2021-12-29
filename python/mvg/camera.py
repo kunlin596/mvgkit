@@ -1,14 +1,15 @@
 #!/usr/bin/env python3 -B
 """This module includes camera models such as a typical pinhole camera model."""
 
-import cv2
-import numpy as np
-import sympy as sp
+from dataclasses import dataclass
 from typing import Optional
 from enum import IntEnum
 
-from mvg import basic
-from dataclasses import dataclass
+import cv2
+import numpy as np
+import sympy as sym
+
+from mvg.basic import SE3, homogeneous
 
 
 class ProjectionType(IntEnum):
@@ -82,11 +83,11 @@ class CameraMatrix:
     def as_matrix(self) -> np.ndarray:
         return np.asarray([[self.fx, self.s, self.cx], [0.0, self.fy, self.cy], [0.0, 0.0, 1.0]])
 
-    def as_symbols(self) -> sp.Matrix:
-        return sp.Matrix(
+    def as_symbols(self) -> sym.Matrix:
+        return sym.Matrix(
             [
-                [sp.Symbol("fx"), sp.Symbol("s"), sp.Symbol("cx")],
-                [0.0, sp.Symbol("fy"), sp.Symbol("cy")],
+                [sym.Symbol("fx"), sym.Symbol("s"), sym.Symbol("cx")],
+                [0.0, sym.Symbol("fy"), sym.Symbol("cy")],
                 [0.0, 0.0, 1.0],
             ]
         )
@@ -108,7 +109,7 @@ class CameraMatrix:
 
     def unproject(self, image_points: np.ndarray) -> np.ndarray:
         """Unproject points image plane to normalized image plane in 3D."""
-        return basic.homogeneous(image_points) @ np.linalg.inv(self.as_matrix()).T
+        return homogeneous(image_points) @ np.linalg.inv(self.as_matrix()).T
 
     @staticmethod
     def project_to_normalized_image_plane(*, points_C):
@@ -123,12 +124,17 @@ class CameraMatrix:
 
 def project_points(
     *,
-    object_points: np.ndarray,
+    object_points_W: np.ndarray,
     camera_matrix: CameraMatrix,
-    camera_pose: basic.SE3,
+    T_CW: Optional[SE3] = None,
     radial_distortion_model: Optional[RadialDistortionModel] = None,
 ) -> np.ndarray:
-    object_points_C = object_points @ camera_pose.R.as_matrix().T + camera_pose.t
+    if T_CW is None:
+        T_CW = SE3()
+
+    assert object_points_W is not None
+
+    object_points_C = object_points_W @ T_CW.R.as_matrix().T + T_CW.t
 
     if radial_distortion_model is not None:
         normalized_image_points = camera_matrix.project_to_normalized_image_plane(
@@ -170,3 +176,26 @@ def undistort(
     mapy = distorted_image_points_map[:, :, 1].astype(np.float32, copy=False)
     undistorted_image = cv2.remap(image, mapx, mapy, cv2.INTER_LINEAR)
     return undistorted_image
+
+
+@dataclass
+class PinholeCamera:
+    """
+    This class describes a pinhole camera model.
+    """
+
+    K: Optional[CameraMatrix] = None
+    k: Optional[RadialDistortionModel] = None
+    p: Optional[TangentialDistortionModel] = None
+    T: Optional[SE3] = None  # Extrinsics, transforms the points in reference frame to camera frame.
+
+    def __post_init__(self):
+        if self.K is None:
+            self.K = CameraMatrix()
+        if self.T is None:
+            self.T = SE3()
+
+    @property
+    def P(self):
+        """Camera projection matrix."""
+        return self.K.as_matrix() @ self.T.as_augmented_matrix()

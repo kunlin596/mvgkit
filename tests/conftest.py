@@ -7,6 +7,7 @@ def pytest_addoption(parser):
     parser.addoption("--data-root-path", action="store", default=default_path, type=str)
     parser.addoption("--intrinsics-rms-threshold", action="store", default=1.5, type=float)
     parser.addoption("--fundamental-rms-threshold", action="store", default=1.5, type=float)
+    parser.addoption("--stereo-reprojection-rms-threshold", action="store", default=0.5, type=float)
 
 
 @pytest.fixture()
@@ -22,3 +23,8 @@ def intrinsics_rms_threshold(pytestconfig):
 @pytest.fixture()
 def fundamental_rms_threshold(pytestconfig):
     return pytestconfig.getoption("fundamental_rms_threshold")
+
+
+@pytest.fixture()
+def stereo_reprojection_rms_threshold(pytestconfig):
+    return pytestconfig.getoption("stereo_reprojection_rms_threshold")
