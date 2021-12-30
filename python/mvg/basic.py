@@ -180,11 +180,13 @@ class SkewSymmetricMatrix3d:
 
     @staticmethod
     def from_vec(vec):
+        vec = np.asarray(vec)
         assert len(vec) == 3
         return SkewSymmetricMatrix3d(np.asarray(vec))
 
     @staticmethod
     def from_matrix(mat):
+        mat = np.asarray(mat)
         assert mat.shape == (3, 3)
         return SkewSymmetricMatrix3d([mat[2, 1], mat[0, 2], mat[1, 0]])
 

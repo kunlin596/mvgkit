@@ -2,16 +2,19 @@
 """This module implement stereo vision related algorithms."""
 
 
+from math import pi, sqrt
 from dataclasses import dataclass
 from typing import Optional
+
 import cv2
-from math import pi, sqrt
+from itertools import product
 
 from scipy.optimize import least_squares
 from scipy.spatial.transform.rotation import Rotation
 
 import numpy as np
 
+from mvg.homography import Homography2d
 from mvg.basic import (
     SkewSymmetricMatrix3d,
     get_isotropic_scaling_matrix_2d,
@@ -39,7 +42,9 @@ class Fundamental:
     def compute(
         *, x_L: np.ndarray, x_R: np.ndarray, options: Optional[Options] = None
     ) -> np.ndarray:
-        assert len(x_L) == len(x_R) and len(x_L) >= 8
+        assert (len(x_L) >= 8) and (
+            len(x_R) >= 8
+        ), f"Not enough points! len(x_L): {len(x_L)}, len(x_R): {len(x_R)}."
 
         if options is None:
             options = Fundamental.Options()
@@ -276,79 +281,80 @@ class Fundamental:
     ):
         import matplotlib.pyplot as plt
 
+        colors = np.random.random((len(points_L), 3)) * 0.7 + 0.1
+
+        def _plot_line(ax, lines, width, height):
+            for i, l in enumerate(lines):
+                points = get_line_points_in_image(l, width, height)
+                ax.plot(points[:, 0], points[:, 1], alpha=0.8, color=colors[i])
+
+        _, (ax1, ax2) = plt.subplots(1, 2, sharey=True, sharex=True)
+
         width = image_L.shape[1]
         height = image_L.shape[0]
 
-        colors = np.random.random((len(points_L), 3)) * 0.7 + 0.1
-
-        def _plot_line(lines):
-            for i, l in enumerate(lines):
-                points = get_line_points_in_image(l, width, height)
-                plt.plot(points[:, 0], points[:, 1], alpha=0.8, color=colors[i])
-
-        plt.figure()
-
-        plt.subplot(121)
-        plt.title("Corresponding epilines of (R) in (L)")
-        plt.imshow(image_L)
-        plt.xlim([0, width])
-        plt.ylim([height, 0])
+        ax1.set_title("Corresponding epilines of (R) in (L)")
+        ax1.imshow(image_L)
+        ax1.set_xlim([0, width])
+        ax1.set_ylim([height, 0])
         left_lines = Fundamental.get_epilines_L(x_R=homogeneous(points_R), F_RL=F_RL)
-        _plot_line(left_lines)
-        plt.scatter(points_L[:, 0], points_L[:, 1], color=colors)
+        _plot_line(ax1, left_lines, width, height)
+        ax1.scatter(points_L[:, 0], points_L[:, 1], color=colors)
 
-        plt.subplot(122)
-        plt.title("Corresponding epilines of (L) in (R)")
-        plt.imshow(image_R)
-        plt.xlim([0, width])
-        plt.ylim([height, 0])
+        width = image_R.shape[1]
+        height = image_R.shape[0]
+
+        ax2.set_title("Corresponding epilines of (L) in (R)")
+        ax2.imshow(image_R)
+        ax2.set_xlim([0, width])
+        ax2.set_ylim([height, 0])
         right_lines = Fundamental.get_epilines_R(x_L=homogeneous(points_L), F_RL=F_RL)
-        _plot_line(right_lines)
-        plt.scatter(points_R[:, 0], points_R[:, 1], color=colors)
+        _plot_line(ax2, right_lines, width, height)
+        ax2.scatter(points_R[:, 0], points_R[:, 1], color=colors)
 
         plt.tight_layout()
         plt.show()
 
-    @staticmethod
-    def _assert_symbolic_A():
-        """This function is used for manual validation."""
-        import sympy as sym
+    # @staticmethod
+    # def _assert_symbolic_A():
+    #     """This function is used for manual validation."""
+    #     import sympy as sym
 
-        x_L = np.array(np.r_[sym.symbols("x1 y1"), 1.0]).reshape(-1, 1)
-        x_R = np.array(np.r_[sym.symbols("x2 y2"), 1.0]).reshape(-1, 1)
+    #     x_L = np.array(np.r_[sym.symbols("x1 y1"), 1.0]).reshape(-1, 1)
+    #     x_R = np.array(np.r_[sym.symbols("x2 y2"), 1.0]).reshape(-1, 1)
 
-        F_RL = []
-        for row in range(1, 4):
-            for col in range(1, 4):
-                F_RL.append(sym.Symbol(f"f{row}{col}"))
-        F_RL = np.asarray(F_RL).reshape(3, 3)
+    #     F_RL = []
+    #     for row in range(1, 4):
+    #         for col in range(1, 4):
+    #             F_RL.append(sym.Symbol(f"f{row}{col}"))
+    #     F_RL = np.asarray(F_RL).reshape(3, 3)
 
-        eqn1 = sym.Matrix(x_R.T @ F_RL @ x_L)
-        eqn2 = sym.Matrix(x_L.T @ F_RL.T @ x_R)
+    #     eqn1 = sym.Matrix(x_R.T @ F_RL @ x_L)
+    #     eqn2 = sym.Matrix(x_L.T @ F_RL.T @ x_R)
 
-        A = np.kron(x_R, x_L)
-        f = F_RL.reshape(-1)
-        Af = A.T @ f
-        eqn3 = sym.Matrix(Af)
+    #     A = np.kron(x_R, x_L)
+    #     f = F_RL.reshape(-1)
+    #     Af = A.T @ f
+    #     eqn3 = sym.Matrix(Af)
 
-        subs = dict(
-            x1=1,
-            x2=2,
-            y1=3,
-            y2=4,
-            f11=1,
-            f12=2,
-            f13=3,
-            f21=4,
-            f22=5,
-            f23=6,
-            f31=7,
-            f32=8,
-            f33=9,
-        )
+    #     subs = dict(
+    #         x1=1,
+    #         x2=2,
+    #         y1=3,
+    #         y2=4,
+    #         f11=1,
+    #         f12=2,
+    #         f13=3,
+    #         f21=4,
+    #         f22=5,
+    #         f23=6,
+    #         f31=7,
+    #         f32=8,
+    #         f33=9,
+    #     )
 
-        assert eqn1.subs(subs) == eqn2.subs(subs)
-        assert eqn3.subs(subs) == eqn1.subs(subs)
+    #     assert eqn1.subs(subs) == eqn2.subs(subs)
+    #     assert eqn3.subs(subs) == eqn1.subs(subs)
 
 
 def decompose_essential_matrix(*, E_RL: np.ndarray):
@@ -398,10 +404,10 @@ class AffinityRecoverySolver:
 
         PPT = w * h / 12.0 * np.diag([w ** 2 - 1.0, h ** 2 - 1.0, 0.0])
 
-        p_c = np.asarray([(w - 1) / 2, (h - 1) / 2, 1.0]).reshape(-1, 1)
-        ppT = p_c @ p_c.T
+        pc = np.asarray([(w - 1) / 2, (h - 1) / 2, 1.0]).reshape(-1, 1)
+        pcpcT = pc @ pc.T
 
-        return (PPT, ppT)
+        return (PPT, pcpcT)
 
     @staticmethod
     def _compute_initial_guess(A, B):
@@ -414,14 +420,14 @@ class AffinityRecoverySolver:
         return D_inv @ y
 
     @staticmethod
-    def _residual_one_term(z, A, B):
-        return (z.T @ A @ z) / (z.T @ B @ z).reshape(-1)
+    def _residual_one_view(z, A, B):
+        return ((z.T @ A @ z) / (z.T @ B @ z)).reshape(-1)
 
     @staticmethod
-    def _residual(z, A_L, B_L, A_R, B_R):
-        distortion_L = AffinityRecoverySolver._residual_one_term(z, A_L, B_L)
-        distortion_R = AffinityRecoverySolver._residual_one_term(z, A_R, B_R)
-        return distortion_L + distortion_R
+    def _residual_two_view(z, A_L, B_L, A_R, B_R):
+        distortion_L = AffinityRecoverySolver._residual_one_view(z, A_L, B_L)
+        distortion_R = AffinityRecoverySolver._residual_one_view(z, A_R, B_R)
+        return np.r_[distortion_L, distortion_R]
 
     @staticmethod
     def _compute_z(A_L, B_L, A_R, B_R):
@@ -429,18 +435,13 @@ class AffinityRecoverySolver:
         initial_z_L = AffinityRecoverySolver._compute_initial_guess(A_L, B_L)
         initial_z_R = AffinityRecoverySolver._compute_initial_guess(A_R, B_R)
 
-        initial_z = np.mean(
-            [
-                initial_z_L / np.linalg.norm(initial_z_L),
-                initial_z_R / np.linalg.norm(initial_z_R),
-            ],
-            axis=0,
-        )
-        # print(f"initial_z_L={initial_z_L}, initial_z_R={initial_z_R}")
+        initial_z_L /= np.linalg.norm(initial_z_L)
+        initial_z_R /= np.linalg.norm(initial_z_R)
+        initial_z = (initial_z_L + initial_z_R) / 2.0
 
-        z0 = initial_z / initial_z[-1]
+        z0 = initial_z / initial_z[initial_z.argmin()]
         result = least_squares(
-            fun=AffinityRecoverySolver._residual,
+            fun=AffinityRecoverySolver._residual_two_view,
             x0=z0,
             args=(A_L, B_L, A_R, B_R),
             loss="huber",
@@ -454,28 +455,50 @@ class AffinityRecoverySolver:
         return z
 
     @staticmethod
-    def _solve_one_image(*, F_RL, PPT_L, ppT_L, PPT_R, ppT_R):
-        """Solve the undistortion homography for left image."""
-        epipole_L = Fundamental.get_epipole_L(F_RL=F_RL)
-        epipole_ssm_L = SkewSymmetricMatrix3d.from_vec(epipole_L).as_matrix()
+    def _get_AB(mat, image_shape):
+        PPT, pcpcT = AffinityRecoverySolver._compute_image_point_matrices(image_shape)
+        A = mat.T @ PPT @ mat
+        B = mat.T @ pcpcT @ mat
+        return (A[:2, :2], B[:2, :2])
 
-        A_L = (epipole_ssm_L.T @ PPT_L @ epipole_ssm_L)[:2, :2]
-        B_L = (epipole_ssm_L.T @ ppT_L @ epipole_ssm_L)[:2, :2]
+    @staticmethod
+    def _build_projective_matrix(mat, z):
+        w = mat @ z
+        w /= w[-1]
+        m = np.eye(3)
+        m[-1] = w
+        return m
 
-        A_R = (F_RL.T @ PPT_R @ F_RL)[:2, :2]
-        B_R = (F_RL.T @ ppT_R @ F_RL)[:2, :2]
+    @staticmethod
+    def _solve_one_view(mat1, mat2, image_shape_1, image_shape_2):
+
+        A_L, B_L = AffinityRecoverySolver._get_AB(mat1, image_shape_1)
+        A_R, B_R = AffinityRecoverySolver._get_AB(mat2, image_shape_2)
 
         # NOTE: z is 2-vector
         z = AffinityRecoverySolver._compute_z(A_L, B_L, A_R, B_R)
 
-        w = epipole_ssm_L @ z
-        w /= w[-1]
+        Hp_L = AffinityRecoverySolver._build_projective_matrix(mat1, z)
+        Hp_R = AffinityRecoverySolver._build_projective_matrix(mat2, z)
 
-        H_p = np.eye(3)
-        H_p[-1] = w
+        return Hp_L, Hp_R
 
-        assert np.allclose((H_p @ epipole_L)[-1], 0.0)
-        return H_p
+    @staticmethod
+    def _solve(F_RL, image_shape_L, image_shape_R):
+        """Solve the undistortion homography for left image."""
+        epipole_L = Fundamental.get_epipole_L(F_RL=F_RL)
+        e_x = SkewSymmetricMatrix3d.from_vec(epipole_L).as_matrix()
+
+        A_L, B_L = AffinityRecoverySolver._get_AB(e_x, image_shape_L)
+        A_R, B_R = AffinityRecoverySolver._get_AB(F_RL, image_shape_R)
+
+        # NOTE: z is 2-vector
+        z = AffinityRecoverySolver._compute_z(A_L, B_L, A_R, B_R)
+
+        Hp_L = AffinityRecoverySolver._build_projective_matrix(e_x, z)
+        Hp_R = AffinityRecoverySolver._build_projective_matrix(F_RL, z)
+
+        return (Hp_L, Hp_R)
 
     @staticmethod
     def solve(*, F_RL, image_shape_L, image_shape_R):
@@ -502,24 +525,175 @@ class AffinityRecoverySolver:
         the "moved" epipolar line we just derived, we can find out the desired homography.
         """
 
-        PPT_L, ppT_L = AffinityRecoverySolver._compute_image_point_matrices(image_shape_L)
-        PPT_R, ppT_R = AffinityRecoverySolver._compute_image_point_matrices(image_shape_R)
+        return AffinityRecoverySolver._solve(F_RL, image_shape_L, image_shape_R)
 
-        Hp_L = AffinityRecoverySolver._solve_one_image(
-            F_RL=F_RL, PPT_L=PPT_L, ppT_L=ppT_L, PPT_R=PPT_R, ppT_R=ppT_R
+
+class StereoRectifier:
+    @staticmethod
+    def _compute_projective_rectification(F_RL, image_shape_L, image_shape_R):
+        return AffinityRecoverySolver.solve(
+            F_RL=F_RL, image_shape_L=image_shape_L, image_shape_R=image_shape_R
         )
 
-        Hp_R = AffinityRecoverySolver._solve_one_image(
-            F_RL=F_RL.T, PPT_L=PPT_R, ppT_L=ppT_R, PPT_R=PPT_L, ppT_R=ppT_L
+    @staticmethod
+    def _compute_similarity_rectification(F_RL, Hp_L, Hp_R, image_shape_L, image_shape_R):
+        points_L = np.asarray(list(product([0, image_shape_L[1]], [0, image_shape_L[0]])))[
+            [0, 1, 3, 2]
+        ]
+        points_R = np.asarray(list(product([0, image_shape_R[1]], [0, image_shape_R[0]])))[
+            [0, 1, 3, 2]
+        ]
+
+        warped_L = Homography2d.from_matrix(Hp_L).transform(points_L)
+        warped_R = Homography2d.from_matrix(Hp_R).transform(points_R)
+
+        vc = -min(warped_L[:, 1].min(), warped_R[:, 1].min())
+
+        F13 = F_RL[0, 2]
+        F23 = F_RL[1, 2]
+        F31 = F_RL[2, 0]
+        F32 = F_RL[2, 1]
+        F33 = F_RL[2, 2]
+
+        w_L = Hp_L[-1]
+        wa = w_L[0]
+        wb = w_L[1]
+
+        Hr_L = np.asarray(
+            [
+                [F32 - wb * F33, wa * F33 - F31, 0.0],
+                [F31 - wa * F33, F32 - wb * F33, F33 + vc],
+                [0.0, 0.0, 1.0],
+            ]
+        )
+        warped_L = warped_L @ Hr_L[:2, :2].T
+
+        w_R = Hp_R[-1]
+        wa = w_R[0]
+        wb = w_R[1]
+        Hr_R = np.asarray(
+            [
+                [wb * F33 - F23, F13 - wa * F33, 0.0],
+                [wa * F33 - F13, wb * F33 - F23, vc],
+                [0.0, 0.0, 1.0],
+            ]
         )
 
-        return (Hp_L, Hp_R)
+        return (Hr_L, Hr_R)
 
+    @staticmethod
+    def _compute_shear_rectification(image_shape, H):
+        w = image_shape[1] - 1.0
+        h = image_shape[0] - 1.0
 
-def compute_rectification_homography(image_L: np.ndarray, image_R: np.ndarray, F_RL: np.ndarray):
-    """
-    Loop, Charles, and Zhengyou Zhang. "Computing rectifying homographies for stereo vision."
-    Proceedings. 1999 IEEE Computer Society Conference on Computer Vision and Pattern Recognition (Cat. No PR00149).
-    Vol. 1. IEEE, 1999.
-    """
-    pass
+        half_w = w / 2.0
+        half_h = h / 2.0
+
+        a = H @ np.array([half_w, 0.0, 1.0])
+        a /= a[-1]
+
+        b = H @ np.array([w, half_h, 1.0])
+        b /= b[-1]
+
+        c = H @ np.array([half_w, h, 1.0])
+        c /= c[-1]
+
+        d = H @ np.array([0.0, half_h, 1.0])
+        d /= d[-1]
+
+        x = b - d
+        y = c - a
+        xu = x[0]
+        xv = x[1]
+        yu = y[0]
+        yv = y[1]
+        hw = h * w
+        h2 = h ** 2
+        w2 = w ** 2
+
+        sa = (h2 * xv ** 2 + w2 * yv ** 2) / (hw * (xv * yu - xu * yv))
+        sb = (h2 * xu * xv + w2 * yu * yv) / (hw * (xu * yv - xv * yu))
+
+        Hs = np.eye(3)
+        Hs[0, :2] = [sa, sb]
+        if sa < 0.0:
+            Hs[0, :2] = -Hs[0, :2]
+
+        return Hs
+
+    @staticmethod
+    def _compute_scaling_factor(H, image_shape):
+        points = np.asarray(list(product([0, image_shape[1]], [0, image_shape[0]])))[[0, 1, 3, 2]]
+        warped_points = Homography2d.from_matrix(H).transform(points)
+
+        area = cv2.contourArea(points.reshape(1, -1, 2).astype(np.float32))
+        warped_area = cv2.contourArea(warped_points.reshape(1, -1, 2).astype(np.float32))
+
+        scaling_factor = sqrt(area / warped_area)
+
+        # Min corner before scaling, we cannot scale it just yet since the we need
+        # to choose the best scaling factor for both images.
+        min_corner = warped_points.min(axis=0)
+        max_corner = warped_points.max(axis=0)
+        return scaling_factor, min_corner, max_corner
+
+    @staticmethod
+    def _adjust_H_range(H_L, H_R, image_shape_L, image_shape_R):
+        scaling_factor_L, min_corner_L, max_corner_L = StereoRectifier._compute_scaling_factor(
+            H_L, image_shape_L
+        )
+        scaling_factor_R, min_corner_R, max_corner_R = StereoRectifier._compute_scaling_factor(
+            H_R, image_shape_R
+        )
+
+        scaling_factor = max(scaling_factor_L, scaling_factor_R)
+
+        scaled_min_corner = np.min(
+            [min_corner_L * scaling_factor, min_corner_R * scaling_factor], axis=0
+        )
+
+        scaled_max_corner_L = max_corner_L * scaling_factor
+        scaled_max_corner_R = max_corner_R * scaling_factor
+
+        scale_mat = np.diag([scaling_factor, scaling_factor, 1.0])
+        scale_mat[:2, 2] = -scaled_min_corner
+
+        width_L, height_L = np.ceil(scaled_max_corner_L - scaled_min_corner).astype(np.int32)
+        width_R, height_R = np.ceil(scaled_max_corner_R - scaled_min_corner).astype(np.int32)
+
+        return (scale_mat @ H_L, scale_mat @ H_R, (width_L, height_L), (width_R, height_R))
+
+    @staticmethod
+    def _get_rectified_image_corners(H, image_shape):
+        image_corners = np.asarray(list(product([0, image_shape[1]], [0, image_shape[0]])))[
+            [0, 1, 3, 2]
+        ]
+        rectified_image_corners = Homography2d.from_matrix(H).transform(image_corners)
+        return rectified_image_corners
+
+    @staticmethod
+    def compute_rectification_homography(
+        image_L: np.ndarray, image_R: np.ndarray, F_RL: np.ndarray
+    ):
+        Hp_L, Hp_R = StereoRectifier._compute_projective_rectification(
+            F_RL, image_L.shape, image_R.shape
+        )
+
+        Hr_L, Hr_R = StereoRectifier._compute_similarity_rectification(
+            F_RL, Hp_L, Hp_R, image_L.shape, image_R.shape
+        )
+
+        Hs_L = StereoRectifier._compute_shear_rectification(image_L.shape, Hr_L @ Hp_L)
+        Hs_R = StereoRectifier._compute_shear_rectification(image_R.shape, Hr_R @ Hp_R)
+
+        H_L = Hs_L @ Hr_L @ Hp_L
+        H_R = Hs_R @ Hr_R @ Hp_R
+
+        H_L, H_R, size_L, size_R = StereoRectifier._adjust_H_range(
+            H_L, H_R, image_L.shape, image_R.shape
+        )
+
+        rectified_image_corners_L = StereoRectifier._get_rectified_image_corners(H_L, image_L.shape)
+        rectified_image_corners_R = StereoRectifier._get_rectified_image_corners(H_R, image_R.shape)
+
+        return (H_L, H_R, size_L, size_R, rectified_image_corners_L, rectified_image_corners_R)

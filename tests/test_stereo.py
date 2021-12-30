@@ -7,7 +7,14 @@ import numpy as np
 
 from mvg.basic import SE3, homogeneous
 from mvg.camera import project_points
-from mvg.stereo import AffinityRecoverySolver, Fundamental, decompose_essential_matrix, triangulate
+from mvg.stereo import (
+    AffinityRecoverySolver,
+    Fundamental,
+    StereoRectifier,
+    decompose_essential_matrix,
+    triangulate,
+)
+from mvg.homography import Homography2d
 
 from stereo_data_fixtures import StereoDataPack
 
@@ -190,7 +197,7 @@ def test_two_view_reprojection_error(
     assert rms_R < threshold, f"rms_R: {rms_R:7.3f} > {threshold}"
 
 
-def test_stereo_rectification(book_stereo_data_pack: StereoDataPack):
+def test_affinity_recovery(book_stereo_data_pack: StereoDataPack):
     image_L = book_stereo_data_pack.image_L
     image_R = book_stereo_data_pack.image_R
     points_L = book_stereo_data_pack.points_L
@@ -217,3 +224,46 @@ def test_stereo_rectification(book_stereo_data_pack: StereoDataPack):
     assert np.allclose(
         (warped_lines_R[:, 1] / warped_lines_R[:, 0]).ptp(), 0.0
     ), "Wrapped lines in right image are not parallel to each other!"
+
+
+def test_stereo_rectification(book_stereo_data_pack: StereoDataPack):
+    image_L = book_stereo_data_pack.image_L
+    image_R = book_stereo_data_pack.image_R
+    points_L = book_stereo_data_pack.points_L
+    points_R = book_stereo_data_pack.points_R
+
+    F_RL = book_stereo_data_pack.F_RL
+    inlier_mask = book_stereo_data_pack.inlier_mask
+
+    points_inliers_L = points_L[inlier_mask]
+    points_inliers_R = points_R[inlier_mask]
+
+    (
+        H_L,
+        H_R,
+        size_L,
+        size_R,
+        rectified_image_corners_L,
+        rectified_image_corners_R,
+    ) = StereoRectifier.compute_rectification_homography(image_L, image_R, F_RL)
+
+    rectified_points_L = Homography2d.from_matrix(H_L).transform(points_inliers_L)
+    rectified_points_R = Homography2d.from_matrix(H_R).transform(points_inliers_R)
+
+    # NOTE(kun): For debug purpose
+    # warped_image_L = cv2.warpPerspective(image_L, H_L, size_L)
+    # warped_image_R = cv2.warpPerspective(image_R, H_R, size_R)
+    # rectified_F_RL = SkewSymmetricMatrix3d.from_vec([1.0, 0.0, 0.0]).as_matrix()
+    # Fundamental.plot_epipolar_lines(
+    #     image_L=warped_image_L,
+    #     image_R=warped_image_R,
+    #     points_L=rectified_points_L,
+    #     points_R=rectified_points_R,
+    #     F_RL=rectified_F_RL,
+    # )
+
+    y_diff_std = (rectified_points_L[:, 1] - rectified_points_R[:, 1]).std()
+    threshold = 0.3
+    assert (
+        y_diff_std < threshold
+    ), f"The std of y difference of rectified corresponding points is bigger than {threshold:7.3f} px!"
