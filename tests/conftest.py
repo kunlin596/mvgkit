@@ -1,7 +1,9 @@
 import pytest
 from pathlib import Path
 
-from stereo_data_fixtures import book_stereo_data_pack, leuven_stereo_data_pack  # noqa: F401
+from stereo_data_fixtures import aloe_stereo_data_pack  # noqa: F401
+from stereo_data_fixtures import book_stereo_data_pack  # noqa: F401
+from stereo_data_fixtures import leuven_stereo_data_pack  # noqa: F401
 
 
 def pytest_addoption(parser):

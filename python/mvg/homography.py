@@ -65,7 +65,23 @@ class Homography2d:
     @staticmethod
     def ensure_projectivity(H: np.ndarray):
         assert H.shape == (3, 3), "H is not a square 3 x 3 matrix!"
-        assert np.linalg.det(H) > 0, "H is not invertible!"
+        # assert np.linalg.det(H) > 0, "H is not invertible!"
+
+    def transform(self, points: np.ndarray):
+        assert len(points.shape) == 2
+
+        is_homogeneous = True
+        if points.shape[1] == 2:
+            is_homogeneous = False
+            points = homogeneous(points)
+
+        transformed = points @ self.as_matrix().T
+        transformed /= transformed[:, -1].reshape(-1, 1)
+
+        if not is_homogeneous:
+            transformed = transformed[:, :2]
+
+        return transformed
 
 
 class HomographySolver2d:

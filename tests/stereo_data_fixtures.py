@@ -4,6 +4,7 @@ import json
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Optional
+from mvg.stereo import Fundamental
 from pytest import fixture
 
 import numpy as np
@@ -78,6 +79,8 @@ def leuven_stereo_data_pack(data_root_path):
         keypoints_L, keypoints_R, matches, dist_threshold=0.8
     )
 
+    F_RL, inlier_mask = Fundamental.compute(x_L=points_L, x_R=points_R)
+
     return StereoDataPack(
         image_L=image_L,
         image_R=image_R,
@@ -86,6 +89,8 @@ def leuven_stereo_data_pack(data_root_path):
         points_L=points_L,
         points_R=points_R,
         camera_matrix=camera_matrix,
+        F_RL=F_RL,
+        inlier_mask=inlier_mask,
     )
 
 
@@ -94,17 +99,36 @@ def aloe_stereo_data_pack(data_root_path):
     root_path = Path(data_root_path) / "stereo" / "aloe"
     with open(root_path / "meta.json", "r") as f:
         meta = json.load(f)
-    image_L = Image.from_file(str(root_path / meta["left"])).resize().data
-    image_R = Image.from_file(str(root_path / meta["right"])).resize().data
+    image_L = Image.from_file(str(root_path / meta["left"])).resize(0.4).data
+    image_R = Image.from_file(str(root_path / meta["right"])).resize(0.4).data
 
     # TODO(kun): after implementing RANSAC point registration, enable auto matching again
     print("Computing feature points and their matches on left and right images...")
-    keypoints_L, descriptors_L = SIFT.detect(image_L)
-    keypoints_R, descriptors_R = SIFT.detect(image_R)
+    keypoints_L, descriptors_L = SIFT.detect(
+        image_L,
+        # options=SIFT.Options(
+        #     num_features=20000,
+        #     num_octave_layers=4,
+        #     contrast_threshold=0.02,
+        #     edge_threshold=7,
+        #     sigma=0.8,
+        # ),
+    )
+    keypoints_R, descriptors_R = SIFT.detect(
+        image_R,
+        # options=SIFT.Options(
+        #     num_features=20000,
+        #     num_octave_layers=4,
+        #     contrast_threshold=0.02,
+        #     edge_threshold=7,
+        #     sigma=0.8,
+        # ),
+    )
     matches = Matcher.match(descriptors1=descriptors_L, descriptors2=descriptors_R)
     points_L, points_R, _ = Matcher.get_matched_points(
-        keypoints_L, keypoints_R, matches, dist_threshold=0.3
+        keypoints_L, keypoints_R, matches, dist_threshold=0.8
     )
+    F_RL, inlier_mask = Fundamental.compute(x_L=points_L, x_R=points_R)
 
     return StereoDataPack(
         image_L=image_L,
@@ -114,6 +138,8 @@ def aloe_stereo_data_pack(data_root_path):
         points_L=points_L,
         points_R=points_R,
         camera_matrix=None,
+        F_RL=F_RL,
+        inlier_mask=inlier_mask,
     )
 
 

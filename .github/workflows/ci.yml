@@ -51,6 +51,6 @@ jobs:
       - name: Test
         run: |
           sudo ./setup.py install
-          python3 -m pytest -q -s \
+          python3 -m pytest -v -s \
             --data-root-path ./tests/data \
-            -- tests/test_calibration.py
+            -- tests
