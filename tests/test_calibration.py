@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 
 import os
-import cv2
 from pathlib import Path
+from pytest import fixture
 
 from mvg.calibration import (
     IntrinsicsCalibration,
@@ -11,7 +11,7 @@ from mvg.calibration import (
     compute_reprejection_error,
 )
 from mvg.camera import CameraMatrix
-from pytest import fixture
+from mvg.image_processing import Image
 
 
 def _detect_corners(path: Path):
@@ -22,7 +22,7 @@ def _detect_corners(path: Path):
         for file in sorted(files):
             filepath = rootpath / file
             if filepath.suffix == ".jpg":
-                image = cv2.imread(str(filepath.absolute()))
+                image = Image.from_file(str(filepath.absolute())).data
                 all_images.append(image)
                 all_image_points.append(find_corners(image=image, grid_rows=6, grid_cols=9))
     return all_image_points, all_images
