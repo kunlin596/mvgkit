@@ -516,16 +516,16 @@ def stereo_calibration(
             rot_left = Rotation.from_rotvec(rvec_left.reshape(3)).as_matrix()
             rot_right = Rotation.from_rotvec(rvec_right.reshape(3)).as_matrix()
 
-            T0 = basic.homogeneous_transformation(rot_left, tvec_left.reshape(3))
-            T1 = basic.homogeneous_transformation(rot_right, tvec_right.reshape(3))
+            T0 = basic.SE3.from_rotvec_pose(np.r_[rot_left, tvec_left.reshape(3)])
+            T1 = basic.SE3.from_rotvec_pose(np.r_[rot_right, tvec_right.reshape(3)])
 
             poses.append(T0 @ T1.T)
 
     rvecs = []
     tvecs = []
     for pose in poses:
-        rvecs.append(Rotation.from_matrix(pose[:3, :3]).as_rotvec())
-        tvecs.append(pose[:3, 3])
+        rvecs.append(pose.R.as_rotvec())
+        tvecs.append(pose.t)
     rvecs = np.asarray(rvecs)
     tvecs = np.asarray(tvecs)
 
