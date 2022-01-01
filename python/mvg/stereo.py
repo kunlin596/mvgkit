@@ -697,3 +697,64 @@ class StereoRectifier:
         rectified_image_corners_R = StereoRectifier._get_rectified_image_corners(H_R, image_R.shape)
 
         return (H_L, H_R, size_L, size_R, rectified_image_corners_L, rectified_image_corners_R)
+
+
+class StereoMatcher:
+    @dataclass
+    class Options:
+        min_disparity: int = 0
+        num_disparities: int = 50
+        block_size: int = 3
+
+    _F_RL: np.ndarray
+    _H_L: np.ndarray
+    _H_R: np.ndarray
+    _image_size_L: np.ndarray
+    _image_size_R: np.ndarray
+    _rectified_size: np.ndarray
+    _rectified_size_L: np.ndarray
+    _rectified_size_R: np.ndarray
+    _rectified_image_corners_L: np.ndarray
+    _rectified_image_corners_R: np.ndarray
+    _stereo_matcher: cv2.StereoSGBM
+    _options: Options
+
+    def __init__(self, F_RL, image_L, image_R, options: Optional[Options] = None):
+        self._F_RL = F_RL
+        if options is None:
+            options = StereoMatcher.Options()
+
+        self._image_size_L = (image_L.shape[1], image_L.shape[0])
+        self._image_size_R = (image_R.shape[1], image_R.shape[0])
+
+        self._options = options
+
+        (
+            self._H_L,
+            self._H_R,
+            self._rectified_size_L,
+            self._rectified_size_R,
+            self._rectified_image_corners_L,
+            self._rectified_image_corners_R,
+        ) = StereoRectifier.compute_rectification_homography(image_L, image_R, self._F_RL)
+
+        self._rectified_size = tuple(
+            np.max([self._rectified_size_L, self._rectified_size_R], axis=0)
+        )
+
+        assert len(self._rectified_image_corners_L) == len(self._rectified_image_corners_R)
+        assert len(self._rectified_image_corners_L) == 4
+
+        self._stereo_matcher = cv2.StereoSGBM_create(
+            minDisparity=options.min_disparity,
+            numDisparities=options.num_disparities,
+            blockSize=options.block_size,
+        )
+
+    def compute(self, image_L, image_R):
+        image_L = cv2.cvtColor(image_L, cv2.COLOR_RGB2GRAY)
+        image_R = cv2.cvtColor(image_R, cv2.COLOR_RGB2GRAY)
+        warped_L = cv2.warpPerspective(image_L, self._H_L, dsize=self._rectified_size)
+        warped_R = cv2.warpPerspective(image_R, self._H_R, dsize=self._rectified_size)
+        disparity_map = self._stereo_matcher.compute(warped_L, warped_R)
+        return disparity_map
