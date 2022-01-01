@@ -10,6 +10,7 @@ from mvg.camera import project_points
 from mvg.stereo import (
     AffinityRecoverySolver,
     Fundamental,
+    StereoMatcher,
     StereoRectifier,
     decompose_essential_matrix,
     triangulate,
@@ -241,10 +242,10 @@ def test_stereo_rectification(book_stereo_data_pack: StereoDataPack):
     (
         H_L,
         H_R,
-        size_L,
-        size_R,
-        rectified_image_corners_L,
-        rectified_image_corners_R,
+        _,  # size_L,
+        _,  # size_R,
+        _,  # rectified_image_corners_L,
+        _,  # rectified_image_corners_R,
     ) = StereoRectifier.compute_rectification_homography(image_L, image_R, F_RL)
 
     rectified_points_L = Homography2d.from_matrix(H_L).transform(points_inliers_L)
@@ -267,3 +268,19 @@ def test_stereo_rectification(book_stereo_data_pack: StereoDataPack):
     assert (
         y_diff_std < threshold
     ), f"The std of y difference of rectified corresponding points is bigger than {threshold:7.3f} px!"
+
+
+def test_stereo_disparity(aloe_stereo_data_pack: StereoDataPack):
+    image_L = aloe_stereo_data_pack.image_L
+    image_R = aloe_stereo_data_pack.image_R
+    # points_L = aloe_stereo_data_pack.points_L
+    # points_R = aloe_stereo_data_pack.points_R
+
+    F_RL = aloe_stereo_data_pack.F_RL
+    # inlier_mask = aloe_stereo_data_pack.inlier_mask
+
+    matcher = StereoMatcher(F_RL, image_L, image_R)
+    disparity_map = matcher.compute(image_L, image_R)
+
+    # TODO(kun): Add more tests
+    assert disparity_map is not None
