@@ -3,7 +3,7 @@
 
 from dataclasses import dataclass
 from math import sqrt
-from typing import Optional
+from typing import List, Optional
 import numpy as np
 import sympy as sp
 from scipy.spatial.transform import Rotation
@@ -114,7 +114,7 @@ class SE3:
     def from_rotmat_tvec(rotmat, tvec):
         return SE3(Rotation.from_matrix(rotmat), tvec)
 
-    def as_homogeneous_matrix(self):
+    def as_matrix(self):
         T = np.eye(4)
         T[:3, :3] = self.R.as_matrix()
         T[:3, 3] = self.t
@@ -135,6 +135,36 @@ class SE3:
 
     def __repr__(self) -> str:
         return f"SE3(R={self.R.as_quat()}, t={self.t})"
+
+    def __matmul__(self, right_term):  # noqa: C901
+        if isinstance(right_term, List):
+            right_term = np.asarray(right_term)
+
+        if isinstance(right_term, np.ndarray):
+            if len(right_term.shape) == 1:
+                if len(right_term) == 3:
+                    return self.R.as_matrix() @ right_term + self.t
+                if len(right_term) == 4:
+                    return self.as_matrix() @ right_term
+            else:
+                if right_term.shape[0] == 3:
+                    return self.R.as_matrix() @ right_term + self.t.reshape(-1, 1)
+                elif right_term.shape[0] == 4:
+                    return self.as_matrix() @ right_term
+                elif right_term.shape[-1] == 3:
+                    return right_term @ self.R.as_matrix().T + self.t
+                elif right_term.shape[-1] == 4:
+                    return right_term @ self.as_matrix().T
+        elif isinstance(right_term, SE3):
+            result = self.as_matrix() @ right_term.as_matrix()
+            return SE3.from_rotmat_tvec(result[:3, :3], result[:3, 3])
+
+    @property
+    def T(self):
+        return self.as_matrix().T
+
+    def transpose(self):
+        return self.T
 
 
 @dataclass
