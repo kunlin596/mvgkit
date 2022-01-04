@@ -201,6 +201,33 @@ class SkewSymmetricMatrix3d:
         return SkewSymmetricMatrix3d(-self.vec)
 
 
+@dataclass
+class PluckerMatrix:
+
+    p1: np.ndarray = np.zeros(4)
+    p2: np.ndarray = np.zeros(4)
+
+    def __post_init__(self):
+        assert len(self.p1) == 4
+        assert len(self.p2) == 4
+        self.p1 = np.asarray(self.p1)
+        self.p2 = np.asarray(self.p2)
+        mat = self.as_matrix()
+        assert np.allclose(mat, -mat.T), "This is not a valid Plucker matrix!"
+
+    @staticmethod
+    def from_vecs(p1, p2):
+        return SkewSymmetricMatrix3d(p1, p2)
+
+    def as_vecs(self):
+        return self.p1, self.p2
+
+    def as_matrix(self):
+        A = self.p1.reshape(-1, 4)
+        B = self.p1.reshape(-1, 4)
+        return A @ B.T - B @ A.T
+
+
 def get_symbolic_rodrigues_rotmat(*, r1: sp.Symbol, r2: sp.Symbol, r3: sp.Symbol):
     # NOTE: Rodrigues's rotation formula, check more
     rvec = np.asarray([r1, r2, r3])
