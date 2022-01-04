@@ -1,5 +1,5 @@
 from math import pi
-from mvg.basic import SE3, SkewSymmetricMatrix3d, homogeneous
+from mvg.basic import SE3, SkewSymmetricMatrix3d, PluckerMatrix, homogeneous
 from numpy import allclose
 import numpy as np
 from pytest import fixture
@@ -57,7 +57,7 @@ def test_SE3_col_points_mul(T, col_points):
     assert np.allclose(points2, col_points)
 
 
-def test_skew_symmetric_matrix():
+def test_skew_symmetric_matrix_3d():
     T1 = SkewSymmetricMatrix3d([1, 1, 1]).as_matrix()
     assert (T1.T == -T1).all()
     assert T1[0, 1] == -1
@@ -71,3 +71,8 @@ def test_skew_symmetric_matrix():
         SkewSymmetricMatrix3d.from_vec(T2).as_matrix(),
         SkewSymmetricMatrix3d.from_vec(-T2).as_matrix().T,
     )
+
+
+def test_PluckerMatrix():
+    T = PluckerMatrix([1, 1, 1, 1], [2, 2, 2, 2]).as_matrix()
+    assert np.allclose(T.T, -T)
