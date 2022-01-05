@@ -9,7 +9,7 @@ import cv2
 import numpy as np
 import sympy as sym
 
-from mvg.basic import SE3, homogeneous
+from mvg.basic import SE3, homogenize
 
 
 class ProjectionType(IntEnum):
@@ -109,7 +109,7 @@ class CameraMatrix:
 
     def unproject(self, image_points: np.ndarray) -> np.ndarray:
         """Unproject points image plane to normalized image plane in 3D."""
-        return homogeneous(image_points) @ np.linalg.inv(self.as_matrix()).T
+        return homogenize(image_points) @ np.linalg.inv(self.as_matrix()).T
 
     @staticmethod
     def project_to_normalized_image_plane(*, points_C):

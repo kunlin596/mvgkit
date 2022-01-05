@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """This module includes basic math functions"""
 
+from __future__ import annotations
 from dataclasses import dataclass
 from math import sqrt
 from typing import List, Optional
@@ -21,14 +22,45 @@ def is_point_array_3d(points: np.ndarray):
     return len(points.shape) == 2 and points.shape[-1] == 3
 
 
-def homogeneous(p: np.ndarray, axis: int = 1, omega: float = 1.0) -> np.ndarray:
+def homogenize(p: np.ndarray | list, axis: int = 1, omega: float = 1.0) -> np.ndarray | list:
+    is_not_ndarray = not isinstance(p, np.ndarray)
+
+    if is_not_ndarray:
+        p = np.asarray(p)
+
+    result = None
     if len(p.shape) == 1:
-        return np.r_[p, 1.0]
+        result = np.r_[p, 1.0]
+
     elif len(p.shape) == 2:
         if axis == 0:
-            return np.vstack([p, np.ones(shape=(1, len(p)), dtype=p.dtype) * omega])
+            result = np.vstack([p, np.ones(shape=(1, len(p)), dtype=p.dtype) * omega])
+
         elif axis == 1:
-            return np.hstack([p, np.ones(shape=(len(p), 1), dtype=p.dtype) * omega])
+            result = np.hstack([p, np.ones(shape=(len(p), 1), dtype=p.dtype) * omega])
+
+    if is_not_ndarray:
+        return result.tolist()
+    return result
+
+
+def dehomogenize(p: np.ndarray | list, axis: int = 1) -> np.ndarray | list:
+    is_not_ndarray = not isinstance(p, np.ndarray)
+    if is_not_ndarray:
+        p = np.asarray(p)
+
+    result = None
+    if len(p.shape) == 1:
+        result = (p / p[-1])[:-1]
+    elif len(p.shape) == 2:
+        if axis == 0:
+            result = (p / p[-1, :].reshape(1, -1))[:-1, :]
+        elif axis == 1:
+            result = (p / p[:, -1].reshape(-1, 1))[:, :-1]
+
+    if is_not_ndarray:
+        return result.tolist()
+    return result
 
 
 def get_isotropic_scaling_matrix_2d(points: np.ndarray, target_distance=None) -> np.ndarray:
@@ -239,7 +271,7 @@ def get_symbolic_rodrigues_rotmat(*, r1: sp.Symbol, r2: sp.Symbol, r3: sp.Symbol
 
 def line_distance_2d(*, points_2d: np.ndarray, line: np.ndarray):
     """Compute the distances of points to line"""
-    return homogeneous(points_2d) @ line / np.linalg.norm(line[:2])
+    return homogenize(points_2d) @ line / np.linalg.norm(line[:2])
 
 
 def normalize_vectors(x, axis=None):
