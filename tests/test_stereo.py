@@ -5,7 +5,7 @@ import cv2
 
 import numpy as np
 
-from mvg.basic import SE3, homogeneous
+from mvg.basic import SE3, homogenize
 from mvg.camera import project_points
 from mvg.stereo import (
     AffinityRecoverySolver,
@@ -49,12 +49,12 @@ def test_fundamental_matrix_manual_correspondence(
 
     rms_cv = Fundamental.compute_geometric_rms(F_RL=Fcv_LR, x_L=points_L, x_R=points_R)
 
-    lines_L = Fundamental.get_epilines_L(x_R=homogeneous(points_R), F_RL=F_RL)
+    lines_L = Fundamental.get_epilines_L(x_R=homogenize(points_R), F_RL=F_RL)
     assert np.allclose(
         Fundamental.get_epipole_L(F_RL=F_RL)[:2], _solve_line_intersections(lines_L)
     ), "Left epipoles from F is not the same as the intersection of all left epilines!"
 
-    lines_R = Fundamental.get_epilines_R(x_L=homogeneous(points_L), F_RL=F_RL)
+    lines_R = Fundamental.get_epilines_R(x_L=homogenize(points_L), F_RL=F_RL)
     assert np.allclose(
         Fundamental.get_epipole_R(F_RL=F_RL)[:2], _solve_line_intersections(lines_R)
     ), "Right epipoles from F is not the same as the intersection of all right epilines!"
@@ -214,13 +214,13 @@ def test_affinity_recovery(book_stereo_data_pack: StereoDataPack):
         F_RL=F_RL, image_shape_L=image_L.shape, image_shape_R=image_R.shape
     )
 
-    lines_L = Fundamental.get_epilines_L(x_R=homogeneous(points_inliers_R), F_RL=F_RL)
+    lines_L = Fundamental.get_epilines_L(x_R=homogenize(points_inliers_R), F_RL=F_RL)
     warped_lines_L = lines_L @ np.linalg.inv(H_L)
     assert np.allclose(
         (warped_lines_L[:, 1] / warped_lines_L[:, 0]).ptp(), 0.0
     ), "Warped lines in left image are not parallel to each other!"
 
-    lines_R = Fundamental.get_epilines_R(x_L=homogeneous(points_inliers_L), F_RL=F_RL)
+    lines_R = Fundamental.get_epilines_R(x_L=homogenize(points_inliers_L), F_RL=F_RL)
     warped_lines_R = lines_R @ np.linalg.inv(H_R)
     assert np.allclose(
         (warped_lines_R[:, 1] / warped_lines_R[:, 0]).ptp(), 0.0

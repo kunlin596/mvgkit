@@ -190,7 +190,7 @@ class _ZhangsMethod:
 
             extrinsics = all_extrinsics[i]
             # xy is the ideal points on normalized image plane
-            xy = basic.homogeneous(object_points_W) @ extrinsics.as_augmented_matrix().T
+            xy = basic.homogenize(object_points_W) @ extrinsics.as_augmented_matrix().T
 
             # uv is the ideal points in the pixel image plane
             uv = xy @ camera_matrix.as_matrix().T

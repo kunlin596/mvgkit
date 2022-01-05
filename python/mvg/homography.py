@@ -6,12 +6,12 @@ import numpy as np
 from scipy.sparse.lil import lil_matrix
 from scipy.optimize import least_squares
 
-from mvg.basic import get_isotropic_scaling_matrix_2d, homogeneous
+from mvg.basic import get_isotropic_scaling_matrix_2d, homogenize
 
 
 @dataclass
 class Homography2d:
-    """This class defines a homography in P2 space, i.e, 2D homogeneous coordinate system."""
+    """This class defines a homography in P2 space, i.e, 2D homogenize coordinate system."""
 
     H: np.ndarray
 
@@ -73,7 +73,7 @@ class Homography2d:
         is_homogeneous = True
         if points.shape[1] == 2:
             is_homogeneous = False
-            points = homogeneous(points)
+            points = homogenize(points)
 
         transformed = points @ self.as_matrix().T
         transformed /= transformed[:, -1].reshape(-1, 1)
@@ -170,7 +170,7 @@ class HomographySolver2d:
 
     @staticmethod
     def _residual(h: np.ndarray, src: np.ndarray, dst: np.ndarray):
-        src = homogeneous(src)
+        src = homogenize(src)
         transformed_src = src @ h.reshape(3, 3).T
         transformed_src[:, :2] /= transformed_src[:, -1].reshape(-1, 1)
         transformed_src = transformed_src[:, :2]

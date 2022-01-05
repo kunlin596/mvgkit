@@ -18,7 +18,7 @@ from mvg.homography import Homography2d
 from mvg.basic import (
     SkewSymmetricMatrix3d,
     get_isotropic_scaling_matrix_2d,
-    homogeneous,
+    homogenize,
     get_line_points_in_image,
 )
 
@@ -55,8 +55,8 @@ class Fundamental:
         N_L = get_isotropic_scaling_matrix_2d(x_L)
         N_R = get_isotropic_scaling_matrix_2d(x_R)
 
-        hom_x_L = homogeneous(x_L)
-        hom_x_R = homogeneous(x_R)
+        hom_x_L = homogenize(x_L)
+        hom_x_R = homogenize(x_R)
 
         normalized_x_L = hom_x_L @ N_L.T
         normalized_x_R = hom_x_R @ N_R.T
@@ -76,7 +76,7 @@ class Fundamental:
 
     @staticmethod
     def _linear_least_square_eight_point(*, x_L: np.ndarray, x_R: np.ndarray):
-        """Solve homogeneous linear equations
+        """Solve homogenize linear equations
 
         Since the objective function is A @ f = 0, w/o loss of generality,
         we can choose to set one of f to be 0, and solve the linear system.
@@ -263,12 +263,12 @@ class Fundamental:
         """Compute the algebraic residual."""
         # NOTE: Diagonal means to remove the cross terms.
         # NOTE: Copy is necessary because somehow the output array from np.diagonal is readonly.
-        return np.diagonal(homogeneous(x_R) @ F_RL @ homogeneous(x_L).T).copy()
+        return np.diagonal(homogenize(x_R) @ F_RL @ homogenize(x_L).T).copy()
 
     @staticmethod
     def compute_geometric_rms(*, F_RL: np.ndarray, x_L: np.ndarray, x_R: np.ndarray):
         """Computes the directional distances from points to their conjugate epilines."""
-        distances = Fundamental._residual(F_RL.reshape(-1), homogeneous(x_L), homogeneous(x_R))
+        distances = Fundamental._residual(F_RL.reshape(-1), homogenize(x_L), homogenize(x_R))
         return sqrt((distances ** 2).mean())
 
     @staticmethod
@@ -297,7 +297,7 @@ class Fundamental:
         ax1.imshow(image_L)
         ax1.set_xlim([0, width])
         ax1.set_ylim([height, 0])
-        left_lines = Fundamental.get_epilines_L(x_R=homogeneous(points_R), F_RL=F_RL)
+        left_lines = Fundamental.get_epilines_L(x_R=homogenize(points_R), F_RL=F_RL)
         _plot_line(ax1, left_lines, width, height)
         ax1.scatter(points_L[:, 0], points_L[:, 1], color=colors)
 
@@ -308,7 +308,7 @@ class Fundamental:
         ax2.imshow(image_R)
         ax2.set_xlim([0, width])
         ax2.set_ylim([height, 0])
-        right_lines = Fundamental.get_epilines_R(x_L=homogeneous(points_L), F_RL=F_RL)
+        right_lines = Fundamental.get_epilines_R(x_L=homogenize(points_L), F_RL=F_RL)
         _plot_line(ax2, right_lines, width, height)
         ax2.scatter(points_R[:, 0], points_R[:, 1], color=colors)
 
