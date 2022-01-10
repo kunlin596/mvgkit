@@ -12,8 +12,6 @@ import cv2
 import pickle
 from typing import List, Optional
 
-from mvg.calibration import undistort_image
-
 
 class StereoViewer(QtCore.QObject):
     _is_recording = False
@@ -128,12 +126,11 @@ class StereoViewer(QtCore.QObject):
         frame = cv2.flip(frame, 1)
 
         if self._undistort_checkbox.isChecked():
-            frame = undistort_image(getattr(self, f"_calibration_data_{index}"), frame)
-            # FIXME: ValueError: ndarray is not C-contiguous
-            frame = frame.copy(order="C")
+            # TODO(kun): add image undistortion function here.
+            pass
 
         if self._rectification_checkbox.isChecked():
-            # TODO
+            # TODO(kun): add image rectification function here.
             pass
 
         image = QtGui.QImage(

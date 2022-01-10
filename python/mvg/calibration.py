@@ -1,6 +1,5 @@
 #!/usr/bin/env python3
 import cv2
-import tqdm
 import numpy as np
 import math
 
@@ -9,15 +8,10 @@ from scipy.spatial.transform import Rotation
 from scipy.optimize import least_squares
 from mvg import basic, homography, camera
 from enum import IntEnum
-from collections import namedtuple
-
-CvIntrinsicsCalibrationData = namedtuple(
-    "CvIntrinsicsCalibrationData",
-    ["camera_matrix", "dist", "rvecs", "tvecs", "width", "height"],
-)
 
 
-def get_chessboard_object_points(*, rows, cols, grid_size):
+def get_chessboard_object_points(*, rows: int, cols: int, grid_size: float):
+    """Util functions for getting planar chess board object points"""
     object_points = np.zeros(shape=(cols * rows, 3), dtype=np.float32)
     object_points[:, :2] = np.transpose(np.mgrid[:cols, :rows], (2, 1, 0)).reshape(-1, 2)
     object_points *= grid_size
@@ -25,7 +19,7 @@ def get_chessboard_object_points(*, rows, cols, grid_size):
 
 
 def find_corners(*, image, grid_rows, grid_cols):
-    """Find chess board corners from color image"""
+    """Detect chess board corners from image"""
     gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
     _, corners = cv2.findChessboardCorners(gray, (grid_cols, grid_rows))
     if corners is None or len(corners) == 0:
@@ -42,7 +36,11 @@ def compute_reprejection_error(
     camera_matrix: camera.CameraMatrix,
     T_CW: basic.SE3,
     radial_distortion_model: Optional[camera.RadialDistortionModel] = None,
-) -> np.ndarray:
+) -> float:
+    """Compute reprojection error
+
+    NOTE: Currently only support radial distortion model.
+    """
     reprojected = camera.project_points(
         object_points_W=object_points_W,
         camera_matrix=camera_matrix,
@@ -51,11 +49,18 @@ def compute_reprejection_error(
     )
 
     rms = math.sqrt((np.linalg.norm(image_points - reprojected, axis=1) ** 2).mean())
-
     return rms
 
 
 class _ZhangsMethod:
+    """Zhang's method for estimating camera parameters
+
+    Reference:
+        Zhengyou Zhang. A flexible new technique for camera calibration.
+        Pattern Analysis and Machine Intelligence,
+        IEEE Transactions on, 22(11):1330–1334, 2000.
+    """
+
     @staticmethod
     def _get_homographies(image_points, object_points):
         homographies = []
@@ -255,6 +260,7 @@ class _ZhangsMethod:
         all_image_points: np.ndarray,
         object_points_W: np.ndarray,
     ) -> Tuple[camera.CameraMatrix, camera.RadialDistortionModel, List[basic.SE3]]:
+        """Refine estimated camera intrinsic parameters"""
 
         x0 = _ZhangsMethod._compose_parameters(
             camera_matrix=camera_matrix,
@@ -289,6 +295,7 @@ class _ZhangsMethod:
         radial_distortion_model: camera.RadialDistortionModel,
         all_extrinsics: List[basic.SE3],
     ):
+        """Compose parameters for calibration"""
         camera_param_array = camera_matrix.as_array()
         radial_distortion_model_array = radial_distortion_model.as_array()
         all_extrinsics_array = np.asarray([pose.as_rotvec_pose() for pose in all_extrinsics])
@@ -297,6 +304,7 @@ class _ZhangsMethod:
 
     @staticmethod
     def _decompose_parameters(*, param_array: np.ndarray, n_points: int):
+        """Decompose parameters from optimization to their original forms"""
         camera_matrix = camera.CameraMatrix(*param_array[:5])
         radial_distortion_model = camera.RadialDistortionModel(*param_array[5:8])
         all_extrinsics_array = param_array[8:].reshape(n_points, 6)
@@ -304,12 +312,7 @@ class _ZhangsMethod:
 
     @staticmethod
     def calibrate(all_image_points, object_points_W, debug=False):
-        """
-        Zhengyou Zhang. A flexible new technique for camera calibration.
-        Pattern Analysis and Machine Intelligence,
-        IEEE Transactions on, 22(11):1330–1334, 2000.
-        """
-
+        """Estimate camera intrinsic and radial distortion parameters"""
         assert len(all_image_points), "Not enough valid image points!"
         homographies = _ZhangsMethod._get_homographies(all_image_points, object_points_W)
 
@@ -372,198 +375,3 @@ class StereoCalibration:
         radial_distortion_model_r: camera.RadialDistortionModel,
     ):
         pass
-
-
-def intrinsic_calibration(*, images, grid_size=0.019):
-    """Calibrate camera using images given calibration board grid size."""
-    print(f"Detecting calibration pattern using {len(images):d} images...")
-    object_points = np.zeros((6 * 8, 3), dtype=np.float32)
-    object_points[:, :2] = np.mgrid[:8, :6].T.reshape(-1, 2)
-    # object_points *= grid_size
-
-    all_image_points = []
-    all_object_points = []
-    for image in tqdm.tqdm(images):
-        corners = find_corners(image)
-        if corners is not None:
-            all_object_points.append(object_points)
-            all_image_points.append(corners)
-
-    assert len(all_image_points) > 0, "Calibration pattern detection failed!"
-
-    width = images[0].shape[1]
-    height = images[0].shape[0]
-    print("Calibrating camera, this might take a while...")
-    ret, camera_matrix, dist, rvecs, tvecs = cv2.calibrateCamera(
-        all_object_points, all_image_points, (width, height), None, None
-    )
-    print("Done calibration.")
-    print("Get optimal camera matrix...")
-    new_camera_matrix, roi = cv2.getOptimalNewCameraMatrix(
-        camera_matrix, dist, (width, height), 1, (width, height)
-    )
-    print("Undistorting images...")
-    mapx, mapy = cv2.initUndistortRectifyMap(
-        camera_matrix, dist, None, new_camera_matrix, (width, height), 5
-    )
-
-    # print("Undistort the images for verification...")
-    # plt.ion()
-    # x, y, w, h = roi
-    # for index, image in enumerate(images):
-    #     distorted = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
-    #     undistorted = cv2.remap(distorted, mapx, mapy, cv2.INTER_LINEAR)
-    #     undistorted = undistorted[y : y + h, x : x + w]
-    #     plt.subplot(121)
-    #     plt.title(f"Distorted {index:d}/{len(images):d}")
-    #     plt.imshow(distorted)
-    #     plt.subplot(122)
-    #     plt.title(f"Undistorted {index:d}/{len(images):d}")
-    #     plt.imshow(undistorted)
-    #     plt.show()
-    #     input()
-
-    # print("Undistort the images for verification...")
-    # plt.ion()
-    # x, y, w, h = roi
-    # for image in images:
-    #     distorted = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
-    #     undistorted = cv2.undistort(
-    #         distorted,
-    #         camera_matrix,
-    #         dist,
-    #         None,
-    #         new_camera_matrix,
-    #     )
-    #     undistorted = undistorted[y : y + h, x : x + w]
-    #     plt.subplot(121)
-    #     plt.title("Distorted")
-    #     plt.imshow(distorted)
-    #     plt.subplot(122)
-    #     plt.title("Undistorted")
-    #     plt.imshow(undistorted)
-    #     plt.show()
-    #     input()
-
-    # embed()
-    return CvIntrinsicsCalibrationData(
-        camera_matrix=camera_matrix,
-        dist=dist,
-        rvecs=rvecs,
-        tvecs=tvecs,
-        width=width,
-        height=height,
-    )
-
-
-def optimize_camera_matrix(*, calibration_data):
-    width = calibration_data.width
-    height = calibration_data.height
-    new_camera_matrix, roi = cv2.getOptimalNewCameraMatrix(
-        calibration_data.camera_matrix,
-        calibration_data.dist,
-        (width, height),
-        1,
-        (width, height),
-    )
-    return new_camera_matrix, roi
-
-
-def stereo_calibration(
-    *,
-    images_left,
-    calibration_data_left,
-    images_right,
-    calibration_data_right,
-    pattern_grid,
-    pattern_grid_size,
-):
-
-    height = pattern_grid[0]
-    width = pattern_grid[1]
-    object_points = np.zeros((height * width, 3), dtype=np.float32)
-    object_points[:, :2] = np.mgrid[:height, :width].T.reshape(-1, 2)
-    object_points *= pattern_grid_size
-
-    camera_matrix_left, roi_left = optimize_camera_matrix(calibration_data=calibration_data_left)
-    camera_matrix_right, roi_right = optimize_camera_matrix(calibration_data=calibration_data_right)
-
-    poses = []
-
-    for image0, image1 in tqdm.tqdm(zip(images_left[::10], images_right[::10])):
-        image0 = undistort_image(calibration_data_left, image0)
-        image1 = undistort_image(calibration_data_right, image1)
-        corners0 = find_corners(image0)
-        corners1 = find_corners(image1)
-
-        if corners0 is None or corners1 is None:
-            continue
-
-        retval_left, rvec_left, tvec_left = cv2.solvePnP(
-            object_points,
-            corners0,
-            camera_matrix_left,
-            None,
-        )
-        retval_right, rvec_right, tvec_right = cv2.solvePnP(
-            object_points,
-            corners1,
-            camera_matrix_right,
-            None,
-        )
-
-        if retval_left and retval_right:
-            rot_left = Rotation.from_rotvec(rvec_left.reshape(3)).as_matrix()
-            rot_right = Rotation.from_rotvec(rvec_right.reshape(3)).as_matrix()
-
-            T0 = basic.SE3.from_rotvec_pose(np.r_[rot_left, tvec_left.reshape(3)])
-            T1 = basic.SE3.from_rotvec_pose(np.r_[rot_right, tvec_right.reshape(3)])
-
-            poses.append(T0 @ T1.T)
-
-    rvecs = []
-    tvecs = []
-    for pose in poses:
-        rvecs.append(pose.R.as_rotvec())
-        tvecs.append(pose.t)
-    rvecs = np.asarray(rvecs)
-    tvecs = np.asarray(tvecs)
-
-    print(
-        f"Rotation std: {np.linalg.norm(rvecs, axis=1).std(axis=0):7.3f}(rad), "
-        f"translation std: {np.linalg.norm(tvecs, axis=1).std():7.3f}(m)"
-    )
-
-    # fig = plt.figure(0)
-    # ax1 = fig.add_subplot(121, projection="3d")
-    # ax1.plot(rvecs[:, 0], rvecs[:, 1], rvecs[:, 2], linewidth=0, marker="o", color="r")
-    # ax1.set_title("Rotation Vectors")
-
-    # ax1 = fig.add_subplot(122, projection="3d")
-    # ax1.plot(tvecs[:, 0], tvecs[:, 1], tvecs[:, 2], linewidth=0, marker="o", color="r")
-    # ax1.set_title("Translation Vectors")
-
-    # plt.legend()
-    # plt.ion()
-    # plt.show()
-
-    # embed()
-
-    return Rotation.from_rotvec(rvecs.mean(axis=0)).as_matrix(), tvecs.mean(axis=0)
-
-
-def undistort_image(calibration_data, image):
-    camera_matrix = calibration_data.camera_matrix
-    dist = calibration_data.dist
-    width = calibration_data.width
-    height = calibration_data.height
-    new_camera_matrix, roi = cv2.getOptimalNewCameraMatrix(
-        camera_matrix, dist, (width, height), 1, (width, height)
-    )
-    x, y, w, h = roi
-    mapx, mapy = cv2.initUndistortRectifyMap(
-        camera_matrix, dist, None, new_camera_matrix, (width, height), 5
-    )
-    undistorted = cv2.remap(image, mapx, mapy, cv2.INTER_LINEAR)
-    undistorted = undistorted[y : y + h, x : x + w]
-    return undistorted
