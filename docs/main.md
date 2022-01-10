@@ -23,9 +23,6 @@
     - [x] Triangulation
     - [ ] Stereo image rectification
     - [ ] Stereo matching
-- Three-view
-    - [ ] Trifocal tensor
-- N-view
 - Image Features
     - [x] Feature matcher
 - Tracking
