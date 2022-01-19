@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 
 from dataclasses import dataclass
+from typing import Optional
 import cv2
 from pathlib import Path
 import numpy as np
@@ -13,6 +14,7 @@ def resize(image, ratio=0.5):
 @dataclass
 class Image:
     data: np.ndarray
+    exif: Optional[dict] = None
 
     @staticmethod
     def from_file(path: Path):
