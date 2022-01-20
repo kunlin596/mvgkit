@@ -14,7 +14,7 @@ def resize(image, ratio=0.5):
 @dataclass
 class Image:
     data: np.ndarray
-    exif: Optional[dict] = None
+    meta: Optional[dict] = None
 
     @staticmethod
     def from_file(path: Path):

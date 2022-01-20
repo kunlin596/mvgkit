@@ -192,8 +192,9 @@ class SE3:
             return SE3.from_rotmat_tvec(result[:3, :3], result[:3, 3])
 
     @property
-    def T(self):
-        return self.as_matrix().T
+    def T(self) -> SE3:
+        Rt = self.R.inv()
+        return SE3(Rt, -Rt.as_matrix() @ self.t)
 
     def transpose(self):
         return self.T
