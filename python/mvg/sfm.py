@@ -147,10 +147,16 @@ class SFM:
     ):
 
         best_result = None
-        for x0 in [(500, 500), (1000, 1000), (1500, 1500), (2000, 2000)]:
+        scores = []
+        for x0 in range(100, 2000, 10):
             result = least_squares(
-                x0=x0, fun=SFM._residual, args=(F_RL, points_L, points_R, image1.data, image2.data)
+                x0=[x0, x0],
+                fun=SFM._residual,
+                args=(F_RL, points_L, points_R, image1.data, image2.data),
             )
+
+            print(x0, result["optimality"])
+            scores.append(result["optimality"])
             if best_result is None or (
                 result["success"] and (result["optimality"] < best_result["optimality"])
             ):
@@ -159,6 +165,10 @@ class SFM:
         T_RL, points3d_L, camera_matrix_L, camera_matrix_R = SFM._compute_T_from_focal_length(
             best_result["x"], F_RL, points_L, points_R, image1.data, image2.data
         )
+        print(best_result)
+        from IPython import embed
+
+        embed()
         return T_RL, points3d_L, camera_matrix_L, camera_matrix_R
 
     @staticmethod
@@ -175,21 +185,21 @@ class SFM:
             image1, image2, F_RL, points_inliers_L, points_inliers_R
         )
 
-        import matplotlib.pyplot as plt
+        reprojected1 = camera_matrix_L.project(points_C=points3d_L)
+        reprojected2 = camera_matrix_R.project(points_C=points3d_L @ T_RL.R.as_matrix().T + T_RL.t)
 
-        projected1 = camera_matrix_L.project(points_C=points3d_L)
-        projected2 = camera_matrix_R.project(points_C=points3d_L @ T_RL.R.as_matrix().T + T_RL.t)
+        import matplotlib.pyplot as plt
 
         plt.figure()
         plt.subplot(121)
         plt.imshow(image1.data)
         plt.scatter(points_inliers_L[:, 0], points_inliers_L[:, 1], alpha=0.5, c="r")
-        plt.scatter(projected1[:, 0], projected1[:, 1], alpha=0.5, c="g")
+        plt.scatter(reprojected1[:, 0], reprojected1[:, 1], alpha=0.5, c="g")
 
         plt.subplot(122)
         plt.imshow(image2.data)
         plt.scatter(points_inliers_R[:, 0], points_inliers_R[:, 1], alpha=0.5, c="r")
-        plt.scatter(projected2[:, 0], projected2[:, 1], alpha=0.5, c="g")
+        plt.scatter(reprojected2[:, 0], reprojected2[:, 1], alpha=0.5, c="g")
         plt.show()
 
         from IPython import embed
