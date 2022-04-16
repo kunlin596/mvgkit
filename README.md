@@ -9,20 +9,27 @@ This repository is a humble invitation for the wonderful multiple view geometry 
 WARNING: Note that this repository is in its very early stage and there's a lot of work to be done. Also, there is no guarantee that things will all work as expected.
 
 ## Build
+
 The current implementations are all done in Python 3, but in the future, the time-critical code will be implemented in C++ to achieve real-time feasibility.
 
 Using a Python virtual environment is recommended here, simply create a standard virtual environment and install the dependencies.
+
 ```shell
 python3 -m pip install -r requirements.txt
 ```
 
-We also provide a convenient bash script that will set up the Python path to the python code such that your editors can have code completion working correctly.
+The Bazel build system is used, refer to [Installing Bazel](https://bazel.build/install) to start.
+After installing Bazel, do
+
 ```shell
-source ./setup_dev.bash
+cd REPO_PATH/src
+bazel build //...
 ```
 
 ## Details
+
 Current feature list: check [main document](./docs/main.md).
 
 ## License
+
 This project is released under ![GPLv3](https://github.com/kunlin596/mvgkit/blob/master/LICENSE).

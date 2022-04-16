@@ -269,7 +269,7 @@ class Fundamental:
     def compute_geometric_rms(*, F_RL: np.ndarray, x_L: np.ndarray, x_R: np.ndarray):
         """Computes the directional distances from points to their conjugate epilines."""
         distances = Fundamental._residual(F_RL.reshape(-1), homogenize(x_L), homogenize(x_R))
-        return sqrt((distances ** 2).mean())
+        return sqrt((distances**2).mean())
 
     @staticmethod
     def plot_epipolar_lines(
@@ -402,7 +402,7 @@ class AffinityRecoverySolver:
         w = image_shape[1]
         h = image_shape[0]
 
-        PPT = w * h / 12.0 * np.diag([w ** 2 - 1.0, h ** 2 - 1.0, 0.0])
+        PPT = w * h / 12.0 * np.diag([w**2 - 1.0, h**2 - 1.0, 0.0])
 
         pc = np.asarray([(w - 1) / 2, (h - 1) / 2, 1.0]).reshape(-1, 1)
         pcpcT = pc @ pc.T
@@ -608,10 +608,10 @@ class StereoRectifier:
         yu = y[0]
         yv = y[1]
         hw = h * w
-        h2 = h ** 2
-        w2 = w ** 2
+        h2 = h**2
+        w2 = w**2
 
-        sa = (h2 * xv ** 2 + w2 * yv ** 2) / (hw * (xv * yu - xu * yv))
+        sa = (h2 * xv**2 + w2 * yv**2) / (hw * (xv * yu - xu * yv))
         sb = (h2 * xu * xv + w2 * yu * yv) / (hw * (xu * yv - xv * yu))
 
         Hs = np.eye(3)

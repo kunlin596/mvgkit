@@ -263,7 +263,7 @@ class PluckerMatrix:
 def get_symbolic_rodrigues_rotmat(*, r1: sp.Symbol, r2: sp.Symbol, r3: sp.Symbol):
     # NOTE: Rodrigues's rotation formula, check more
     rvec = np.asarray([r1, r2, r3])
-    theta = sp.sqrt(r1 ** 2 + r2 ** 2 + r3 ** 2)
+    theta = sp.sqrt(r1**2 + r2**2 + r3**2)
     rvec /= theta
     K = sp.Matrix(np.cross(rvec, np.eye(3))).T
     return sp.eye(3) + sp.sin(theta) * K + (1.0 - sp.cos(theta)) * K @ K
