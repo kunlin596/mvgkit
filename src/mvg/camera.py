@@ -29,8 +29,8 @@ class RadialDistortionModel:
         x = normalized_image_points[:, 0]
         y = normalized_image_points[:, 1]
         r2 = np.linalg.norm(normalized_image_points, axis=1) ** 2
-        r4 = r2 ** 2
-        r6 = r4 ** 2
+        r4 = r2**2
+        r6 = r4**2
         coeff = 1.0 + self.k1 * r2 + self.k2 * r4 + self.k3 * r6
         return np.vstack([x * coeff, y * coeff]).T
 
@@ -52,8 +52,8 @@ class TangentialDistortionModel:
         xy = x * y
         return np.vstack(
             [
-                x + (2.0 * x * xy + y * (r2 + 2.0 * x ** 2)),
-                y + (2.0 * y * xy + x * (r2 + 2.0 * y ** 2)),
+                x + (2.0 * x * xy + y * (r2 + 2.0 * x**2)),
+                y + (2.0 * y * xy + x * (r2 + 2.0 * y**2)),
             ]
         ).T
 

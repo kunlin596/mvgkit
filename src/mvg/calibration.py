@@ -209,7 +209,7 @@ class _ZhangsMethod:
             xy = xy[:, :2]
 
             r2 = np.linalg.norm(xy, axis=1) ** 2
-            r4 = r2 ** 2
+            r4 = r2**2
 
             D.append([(u - cx) * r2, (u - cx) * r4])
             D.append([(v - cy) * r2, (v - cy) * r4])
