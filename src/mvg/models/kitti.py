@@ -37,11 +37,11 @@ from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
 from typing import Dict, List
-from scipy.spatial.transform import Rotation
 
 import cv2
 import numpy as np
 import tqdm
+from scipy.spatial.transform import Rotation
 
 
 @dataclass
@@ -137,7 +137,39 @@ class Image:
 
 @dataclass
 class LiDARScan:
-    data: np.ndarray
+    """
+    Here, data contains 4*num values, where the first 3 values correspond to
+    x,y and z, and the last value is the reflectance information. All scans
+    are stored row-aligned, meaning that the first 4 values correspond to the
+    first measurement. Since each scan might potentially have a different
+    number of points, this must be determined from the file size when reading
+    the file, where 1e6 is a good enough upper bound on the number of values:
+
+    // allocate 4 MB buffer (only ~130*4*4 KB are needed)
+    int32_t num = 1000000;
+    float *data = (float*)malloc(num*sizeof(float));
+
+    // pointers
+    float *px = data+0;
+    float *py = data+1;
+    float *pz = data+2;
+    float *pr = data+3;
+
+    // load point cloud
+    FILE *stream;
+    stream = fopen (currFilenameBinary.c_str(),"rb");
+    num = fread(data,sizeof(float),num,stream)/4;
+    for (int32_t i=0; i<num; i++) {
+        point_cloud.points.push_back(tPoint(*px,*py,*pz,*pr));
+        px+=4; py+=4; pz+=4; pr+=4;
+    }
+    fclose(stream);
+
+    x,y and y are stored in metric (m) Velodyne coordinates.
+    """
+
+    points: np.ndarray
+    reflectance: np.ndarray
     timestamp: float
 
 
@@ -208,12 +240,15 @@ class KittiDrive:
         filename = f"{KittiDrive._get_file_name_from_index(index)}.png"
         image = cv2.imread(str(path / filename))
         image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
-        return image
+        return [image]
 
     @staticmethod
     def _read_lidar_scan(path: Path, index: int):
-        filename = f"{KittiDrive._get_file_name_from_index(index)}.txt"
-        return np.fromfile(path / filename, dtype=np.float32)
+        filename = f"{KittiDrive._get_file_name_from_index(index)}.bin"
+        data = np.fromfile(path / filename, dtype=np.float32).reshape(-1, 4)
+        points = data[:, :3]
+        reflectance = data[:, -1]
+        return points, reflectance
 
     @staticmethod
     def _read_imu_measurements(path: Path, index: int):
@@ -222,7 +257,7 @@ class KittiDrive:
             raw_data = list(map(float, f.readline().split(" ")))
             raw_data[-5:] = list(map(int, raw_data[-5:]))
             packet = IMUPacket(*raw_data)
-            return packet
+            return [packet]
 
     def _read_data(self, data_rootpath, data_id, read_func, data_cls, indices):
         assert isinstance(indices, list), f"Argument indices={indices} should be a list!"
@@ -240,7 +275,7 @@ class KittiDrive:
         for i in indices:
             self._ensure_file_index(i)
             data = read_func(data_rootpath / data_id / "data", i)
-            datalist.append(data_cls(data, self._timestamps[data_id][i]))
+            datalist.append(data_cls(*data, self._timestamps[data_id][i]))
         return datalist
 
     def read_image(self, camera_id: int, indices: List[int], data_type: str = "sync"):
