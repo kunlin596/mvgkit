@@ -4,13 +4,40 @@ TODO: Generalize the common part of the data attributes and make it generic.
 
 See http://www.cvlibs.net/datasets/kitti/setup.php for more information
 about the sensor configurations.
+
+Notes about calibration:
+A (camera 0) and B (camera 1) are gray scale cameras, C (camera 2) and D (camera 3) are color cameras.
+A is the center of origin. In the calibration file the transformation from LiDAR to camera 0,
+T_AL and IMU/GPS to LiDAR T_LI are provided.
+
+Here, frame (A), (B), (C), (D) are camera 0, 1, 2, 3, frame (L) is LiDAR frame and frame (I) is IMU/GPS frame.
+
+The camera images are stored in the following directories:
+
+  - 'image_00': left rectified grayscale image sequence
+  - 'image_01': right rectified grayscale image sequence
+  - 'image_02': left rectified color image sequence
+  - 'image_03': right rectified color image sequence
+
+
+The coordinate systems are defined the following way, where directions
+are informally given from the drivers view, when looking forward onto
+the road:
+
+  - Camera:   x: right,   y: down,  z: forward
+  - LiDAR:    x: forward, y: left,  z: up
+  - IMU/GPS:  x: forward, y: right, z: down
+
+Reference:
+    [1] https://github.com/yanii/kitti-pcl/blob/master/KITTI_README.TXT
 """
 
 import zipfile
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
-from typing import List
+from typing import Dict, List
+from scipy.spatial.transform import Rotation
 
 import cv2
 import numpy as np
@@ -19,6 +46,43 @@ import tqdm
 
 @dataclass
 class IMUPacket:
+    """
+    The data structure includes IMU/GPS attributes, however for simplicity it's called IMU here.
+
+    NOTE: The information below is copied from dataformat.txt shipped w/ Kitti.
+
+        lat:            latitude of the oxts-unit (deg)
+        lon:            longitude of the oxts-unit (deg)
+        alt:            altitude of the oxts-unit (m)
+        roll:           roll angle (rad), 0 = level, positive = left side up, range: -pi .. +pi
+        pitch:          pitch angle (rad), 0 = level, positive = front down, range: -pi/2 .. +pi/2
+        yaw:            heading (rad), 0 = east, positive = counter clockwise, range: -pi .. +pi
+        vn:             velocity towards north (m/s)
+        ve:             velocity towards east (m/s)
+        vf:             forward velocity, i.e. parallel to earth-surface (m/s)
+        vl:             leftward velocity, i.e. parallel to earth-surface (m/s)
+        vu:             upward velocity, i.e. perpendicular to earth-surface (m/s)
+        ax:             acceleration in x, i.e. in direction of vehicle front (m/s^2)
+        ay:             acceleration in y, i.e. in direction of vehicle left (m/s^2)
+        ay:             acceleration in z, i.e. in direction of vehicle top (m/s^2)
+        af:             forward acceleration (m/s^2)
+        al:             leftward acceleration (m/s^2)
+        au:             upward acceleration (m/s^2)
+        wx:             angular rate around x (rad/s)
+        wy:             angular rate around y (rad/s)
+        wz:             angular rate around z (rad/s)
+        wf:             angular rate around forward axis (rad/s)
+        wl:             angular rate around leftward axis (rad/s)
+        wu:             angular rate around upward axis (rad/s)
+        pos_accuracy:   velocity accuracy (north/east in m)
+        vel_accuracy:   velocity accuracy (north/east in m/s)
+        navstat:        navigation status (see navstat_to_string)
+        numsats:        number of satellites tracked by primary GPS receiver
+        posmode:        position mode of primary GPS receiver (see gps_mode_to_string)
+        velmode:        velocity mode of primary GPS receiver (see gps_mode_to_string)
+        orimode:        orientation mode of primary GPS receiver (see gps_mode_to_string)
+    """
+
     lat: float
     lon: float
     alt: float
@@ -77,7 +141,7 @@ class LiDARScan:
     timestamp: float
 
 
-class KittiDataset:
+class KittiDrive:
     def __init__(self, path: Path, unzip=False):
         """
         `path` has the format: 2011_10_03_drive_0058.
@@ -141,19 +205,19 @@ class KittiDataset:
 
     @staticmethod
     def _read_image(path: Path, index: int):
-        filename = f"{KittiDataset._get_file_name_from_index(index)}.png"
+        filename = f"{KittiDrive._get_file_name_from_index(index)}.png"
         image = cv2.imread(str(path / filename))
         image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
         return image
 
     @staticmethod
     def _read_lidar_scan(path: Path, index: int):
-        filename = f"{KittiDataset._get_file_name_from_index(index)}.txt"
+        filename = f"{KittiDrive._get_file_name_from_index(index)}.txt"
         return np.fromfile(path / filename, dtype=np.float32)
 
     @staticmethod
     def _read_imu_measurements(path: Path, index: int):
-        filename = f"{KittiDataset._get_file_name_from_index(index)}.txt"
+        filename = f"{KittiDrive._get_file_name_from_index(index)}.txt"
         with open(path / filename, "r") as f:
             raw_data = list(map(float, f.readline().split(" ")))
             raw_data[-5:] = list(map(int, raw_data[-5:]))
@@ -195,3 +259,179 @@ class KittiDataset:
             self._path / data_type, "oxts", self._read_imu_measurements, IMUMeasurements, indices
         )
         return imu_measurements
+
+
+@dataclass
+class KittiCameraCalibration:
+
+    unrectified_image_size: np.ndarray
+    unrectified_camera_matrix: np.ndarray
+    unrectified_distortion_coefficients: np.ndarray
+
+    R: Rotation
+    t: np.ndarray
+    R_rectification: Rotation
+
+    image_size: np.ndarray
+    P: np.ndarray
+
+
+@dataclass
+class KittiStereoCalibration:
+    """
+    calib_cam_to_cam.txt: Camera-to-camera calibration
+
+        - S_xx: 1x2 size of image xx before rectification
+        - K_xx: 3x3 calibration matrix of camera xx before rectification
+        - D_xx: 1x5 distortion vector of camera xx before rectification
+        - R_xx: 3x3 rotation matrix of camera xx (extrinsic)
+        - T_xx: 3x1 translation vector of camera xx (extrinsic)
+        - S_rect_xx: 1x2 size of image xx after rectification
+        - R_rect_xx: 3x3 rectifying rotation to make image planes co-planar
+        - P_rect_xx: 3x4 projection matrix after rectification
+
+    TODO: Improve and use Camera class
+    """
+
+    timestamp: float
+    corner_dist: float
+    calibrations: Dict[int, KittiCameraCalibration]
+
+
+@dataclass
+class KittiLiDARCalibration:
+    """
+    calib_velo_to_cam.txt: Velodyne-to-camera registration
+
+        - R: 3x3 rotation matrix
+        - T: 3x1 translation vector
+        - delta_f: deprecated
+        - delta_c: deprecated
+    """
+
+    timestamp: float
+    R: Rotation
+    t: np.ndarray
+    delta_f: np.ndarray
+    delta_c: np.ndarray
+
+
+@dataclass
+class KittiIMUCalibration:
+    """
+    calib_imu_to_velo.txt: IMU/GPS-to-Velodyne registration
+
+        - R: 3x3 rotation matrix
+        - T: 3x1 translation vector
+    """
+
+    timestamp: float
+    R: Rotation
+    t: np.ndarray
+
+
+class KittiCalibration:
+    def __init__(self, path: Path):
+        raw_imu_to_lidar = self._read_raw_imu_to_lidar(path / "calib_imu_to_velo.txt")
+        raw_lidar_to_cam = self._read_raw_lidar_to_cam(path / "calib_velo_to_cam.txt")
+        raw_cam_to_cam = self._read_raw_cam_to_cam(path / "calib_cam_to_cam.txt")
+
+        self._imu_calibration = self._process_imu_to_lidar(raw_imu_to_lidar)
+        self._lidar_calibration = self._process_lidar_to_cam(raw_lidar_to_cam)
+        self._stereo_calibration = self._process_cam_to_cam(raw_cam_to_cam)
+
+    @property
+    def lidar_calibration(self):
+        return self._lidar_calibration
+
+    @property
+    def stereo_calibration(self):
+        return self._stereo_calibration
+
+    @property
+    def imu_calibration(self):
+        return self._imu_calibration
+
+    @staticmethod
+    def _read_raw_calib_file(path: Path):
+        """Read raw calibration file
+        The first line is datetime, and the rest are calibration data.
+        """
+        data = dict()
+        with open(path, "r") as f:
+            lines = f.read().splitlines()
+            key, value = lines[0].split(": ", 1)
+            timestamp = datetime.strptime(value, "%d-%b-%Y %H:%M:%S").timestamp()
+            data[key] = timestamp
+            for line in lines[1:]:
+                key, value = line.split(": ", 1)
+                data[key] = np.fromstring(value, sep=" ", dtype=np.float32)
+        return data
+
+    @staticmethod
+    def _process_lidar_to_cam(data):
+        return KittiLiDARCalibration(
+            timestamp=data["calib_time"],
+            R=Rotation.from_matrix(data["R"].reshape(3, 3)),
+            t=data["T"],
+            delta_f=data["delta_f"],
+            delta_c=data["delta_c"],
+        )
+
+    @staticmethod
+    def _process_single_cam(data):
+        return KittiCameraCalibration(
+            unrectified_image_size=data["S"].astype(np.int32),
+            unrectified_camera_matrix=data["K"].reshape(3, 3),
+            unrectified_distortion_coefficients=data["D"].reshape(5),
+            R=Rotation.from_matrix(data["R"].reshape(3, 3)),
+            t=data["T"],
+            image_size=data["S_rect"].astype(np.int32),
+            R_rectification=Rotation.from_matrix(data["R_rect"].reshape(3, 3)),
+            P=data["P_rect"].reshape(3, 4),
+        )
+
+    @staticmethod
+    def _process_cam_to_cam(data):
+        rawdata = dict()
+        for k, v in data.items():
+            components = k.split("_")
+            if not components[-1].isnumeric():
+                continue
+
+            index = int(components[-1])
+            var_name = "_".join(components[:-1])
+
+            if index not in rawdata:
+                rawdata[index] = dict()
+            rawdata[index][var_name] = v
+
+        calibrations = dict()
+        for k, v in rawdata.items():
+            calibrations[k] = KittiCalibration._process_single_cam(v)
+
+        return KittiStereoCalibration(
+            timestamp=data["calib_time"],
+            corner_dist=float(data["corner_dist"]),
+            calibrations=calibrations,
+        )
+
+    @staticmethod
+    def _process_imu_to_lidar(data):
+        return KittiIMUCalibration(
+            timestamp=data["calib_time"],
+            R=Rotation.from_matrix(data["R"].reshape(3, 3)),
+            t=data["T"],
+        )
+
+    @staticmethod
+    def _read_raw_cam_to_cam(path: Path):
+        return KittiCalibration._read_raw_calib_file(path)
+
+    @staticmethod
+    def _read_raw_imu_to_lidar(path: Path):
+        return KittiCalibration._read_raw_calib_file(path)
+
+    @staticmethod
+    def _read_raw_lidar_to_cam(path: Path):
+        return KittiCalibration._read_raw_calib_file(path)
