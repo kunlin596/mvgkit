@@ -2,16 +2,16 @@
 
 import os
 from pathlib import Path
-from pytest import fixture
 
 from mvg.calibration import (
     IntrinsicsCalibration,
+    compute_reprejection_error,
     find_corners,
     get_chessboard_object_points,
-    compute_reprejection_error,
 )
 from mvg.camera import CameraMatrix
 from mvg.image_processing import Image
+from pytest import fixture
 
 
 def _detect_corners(path: Path):
