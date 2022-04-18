@@ -6,6 +6,16 @@ py_test(
 )
 
 py_test(
+    name = "test_camera",
+    srcs = ["test_camera.py"],
+    main = "test_camera.py",
+    deps = [
+        "//mvg:basic",
+        "//mvg:camera",
+    ],
+)
+
+py_test(
     name = "test_calibration",
     srcs = ["test_calibration.py"],
     main = "test_calibration.py",

@@ -1,13 +1,15 @@
-#!/usr/bin/env python3 -B
-"""This module includes camera models such as a typical pinhole camera model."""
+"""This module includes camera models such as a typical pinhole camera model.
+
+TODO: Check for tilt distortion.
+TODO: Implement orthographic projection
+TODO: Implement image (un)-projection
+"""
 
 from dataclasses import dataclass
-from typing import Optional
 from enum import IntEnum
+from typing import Optional
 
-import cv2
 import numpy as np
-import sympy as sym
 
 from mvg.basic import SE3, homogenize
 
@@ -25,17 +27,20 @@ class RadialDistortionModel:
     k2: float = 0.0
     k3: float = 0.0
 
-    def distort(self, *, normalized_image_points: np.ndarray) -> np.ndarray:
-        x = normalized_image_points[:, 0]
-        y = normalized_image_points[:, 1]
-        r2 = np.linalg.norm(normalized_image_points, axis=1) ** 2
+    # TODO: k4, k5, k6 are not used yet.
+    k4: float = 0.0
+    k5: float = 0.0
+    k6: float = 0.0
+
+    def get_coord_coeffs(self, image_points):
+        r2 = np.linalg.norm(image_points, axis=1) ** 2
         r4 = r2**2
-        r6 = r4**2
-        coeff = 1.0 + self.k1 * r2 + self.k2 * r4 + self.k3 * r6
-        return np.vstack([x * coeff, y * coeff]).T
+        r6 = r2 * r4
+        coeffs = 1.0 + self.k1 * r2 + self.k2 * r4 + self.k3 * r6
+        return coeffs.reshape(len(image_points), 1)
 
     def as_array(self):
-        return np.asarray([self.k1, self.k2, self.k3])
+        return np.asarray([self.k1, self.k2, self.k3, self.k3, self.k5, self.k6])
 
 
 @dataclass
@@ -45,26 +50,17 @@ class TangentialDistortionModel:
     p1: float = 0.0
     p2: float = 0.0
 
-    def distort(self, normalized_image_points: np.ndarray) -> np.ndarray:
-        r2 = np.linalg.norm(normalized_image_points, axis=1) ** 2
-        x = normalized_image_points[:, 0]
-        y = normalized_image_points[:, 1]
+    def get_coord_coeffs(self, image_points):
+        r2 = np.linalg.norm(image_points, axis=1) ** 2
+        x = image_points[:, 0]
+        y = image_points[:, 1]
         xy = x * y
-        return np.vstack(
-            [
-                x + (2.0 * x * xy + y * (r2 + 2.0 * x**2)),
-                y + (2.0 * y * xy + x * (r2 + 2.0 * y**2)),
-            ]
-        ).T
+        delta_x = 2.0 * self.p1 * xy + self.p2 * (r2 + 2.0 * x**2)
+        delta_y = 2.0 * self.p2 * xy + self.p1 * (r2 + 2.0 * y**2)
+        return np.vstack([delta_x, delta_y]).T
 
-
-def distort(*, image_points: np.ndarray, distortion_coeffs: np.ndarray) -> np.ndarray:
-    assert (
-        len(distortion_coeffs) == 5
-    ), "Only support distortion coefficients in the format of [k1, k2, k3, p1, p2]!"
-    distorted = RadialDistortionModel(distortion_coeffs[:3]).distort(image_points)
-    distorted = TangentialDistortionModel(distortion_coeffs[3:]).distort(distorted)
-    return distorted
+    def as_array(self):
+        return np.asarray([self.p1, self.p2])
 
 
 @dataclass
@@ -83,15 +79,6 @@ class CameraMatrix:
     def as_matrix(self) -> np.ndarray:
         return np.asarray([[self.fx, self.s, self.cx], [0.0, self.fy, self.cy], [0.0, 0.0, 1.0]])
 
-    def as_symbols(self) -> sym.Matrix:
-        return sym.Matrix(
-            [
-                [sym.Symbol("fx"), sym.Symbol("s"), sym.Symbol("cx")],
-                [0.0, sym.Symbol("fy"), sym.Symbol("cy")],
-                [0.0, 0.0, 1.0],
-            ]
-        )
-
     @staticmethod
     def from_array(array: np.ndarray):
         assert len(array) == 5
@@ -103,7 +90,7 @@ class CameraMatrix:
         return CameraMatrix(matrix[0, 0], matrix[1, 1], matrix[0, 2], matrix[1, 2], matrix[0, 1])
 
     def project(self, points_C: np.ndarray) -> np.ndarray:
-        """Project points in camera frame (C) to image plane"""
+        """Project points in camera frame (C) to image plane."""
         image_points = points_C @ self.as_matrix().T
         return (image_points[:, :2] / image_points[:, 2].reshape(-1, 1))[:, :2]
 
@@ -121,81 +108,53 @@ class CameraMatrix:
         K = self.as_matrix()
         return normalized_image_points @ K[:2, :2].T + K[:2, -1]
 
-
-def project_points(
-    *,
-    object_points_W: np.ndarray,
-    camera_matrix: CameraMatrix,
-    T_CW: Optional[SE3] = None,
-    radial_distortion_model: Optional[RadialDistortionModel] = None,
-) -> np.ndarray:
-    if T_CW is None:
-        T_CW = SE3()
-
-    assert object_points_W is not None
-
-    object_points_C = object_points_W @ T_CW.R.as_matrix().T + T_CW.t
-
-    if radial_distortion_model is not None:
-        normalized_image_points = camera_matrix.project_to_normalized_image_plane(
-            points_C=object_points_C
-        )
-        distorted_normalized_image_points = radial_distortion_model.distort(
-            normalized_image_points=normalized_image_points
-        )
-        projected = camera_matrix.project_to_sensor_image_plane(
-            normalized_image_points=distorted_normalized_image_points
-        )
-    else:
-        projected = camera_matrix.project(object_points_C)
-    return projected
-
-
-def undistort(
-    *,
-    image: np.ndarray,
-    camera_matrix: CameraMatrix,
-    radial_distortion_model: Optional[RadialDistortionModel] = None,
-):
-    shape = image.shape
-    undistorted_image_points = np.mgrid[: shape[1], : shape[0]].T
-    undistorted_normalized_points = camera_matrix.unproject(undistorted_image_points.reshape(-1, 2))
-
-    distorted_normalized_points = undistorted_normalized_points
-    if radial_distortion_model is not None:
-        distorted_normalized_points = radial_distortion_model.distort(
-            normalized_image_points=undistorted_normalized_points
-        )
-
-    distorted_image_points = camera_matrix.project_to_sensor_image_plane(
-        normalized_image_points=distorted_normalized_points
-    )
-
-    distorted_image_points_map = distorted_image_points.reshape(shape[0], shape[1], -1)
-    mapx = distorted_image_points_map[:, :, 0].astype(np.float32, copy=False)
-    mapy = distorted_image_points_map[:, :, 1].astype(np.float32, copy=False)
-    undistorted_image = cv2.remap(image, mapx, mapy, cv2.INTER_LINEAR)
-    return undistorted_image
+    def unproject_to_normalized_image_plane(self, sensor_image_points):
+        K = self.as_matrix()
+        return (sensor_image_points - K[:2, -1]) @ np.linalg.inv(K[:2, :2]).T
 
 
 @dataclass
-class PinholeCamera:
+class Camera:
     """
     This class describes a pinhole camera model.
     """
 
-    K: Optional[CameraMatrix] = None
-    k: Optional[RadialDistortionModel] = None
-    p: Optional[TangentialDistortionModel] = None
-    T: Optional[SE3] = None  # Extrinsics, transforms the points in reference frame to camera frame.
+    K: Optional[CameraMatrix] = CameraMatrix()
+    k: Optional[RadialDistortionModel] = RadialDistortionModel()
+    p: Optional[TangentialDistortionModel] = TangentialDistortionModel()
 
-    def __post_init__(self):
-        if self.K is None:
-            self.K = CameraMatrix()
-        if self.T is None:
-            self.T = SE3()
+    # Extrinsics, transforms the points in reference frame to camera frame.
+    T: Optional[SE3] = SE3()
 
     @property
     def P(self):
         """Camera projection matrix."""
         return self.K.as_matrix() @ self.T.as_augmented_matrix()
+
+    def project_points(self, points_W, distort=False):
+        """Project points in world frame to image points."""
+        points_C = (self.T @ homogenize(points_W))[:, :3]
+        image_points = self.K.project(points_C=points_C)
+        if distort:
+            return self.distort_points(image_points)
+        return image_points
+
+    def distort_points(self, undistorted_image_points: np.ndarray):
+        """Distort the undistorted image points."""
+        normalized_image_points = self.K.unproject_to_normalized_image_plane(
+            undistorted_image_points
+        )
+        k_coeffs = self.k.get_coord_coeffs(normalized_image_points)
+        p_coeffs = self.p.get_coord_coeffs(normalized_image_points)
+        distorted = normalized_image_points * k_coeffs + p_coeffs
+        image_points = self.K.project_to_sensor_image_plane(normalized_image_points=distorted)
+        return image_points
+
+    def undistort_points(self, distorted_image_points: np.ndarray):
+        """Undistort the distorted image points."""
+        normalized_image_points = self.K.unproject_to_normalized_image_plane(distorted_image_points)
+        k_coeffs = self.k.get_coord_coeffs(normalized_image_points)
+        p_coeffs = self.p.get_coord_coeffs(normalized_image_points)
+        undistorted = (normalized_image_points - p_coeffs) / k_coeffs
+        image_points = self.K.project_to_sensor_image_plane(normalized_image_points=undistorted)
+        return image_points

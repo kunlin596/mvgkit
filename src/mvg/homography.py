@@ -3,7 +3,7 @@
 from dataclasses import dataclass
 
 import numpy as np
-from scipy.sparse.lil import lil_matrix
+from scipy.sparse import lil_matrix
 from scipy.optimize import least_squares
 
 from mvg.basic import get_isotropic_scaling_matrix_2d, homogenize

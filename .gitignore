@@ -130,3 +130,6 @@ dmypy.json
 
 # Bazel
 *bazel-*
+
+# editor
+.vscode

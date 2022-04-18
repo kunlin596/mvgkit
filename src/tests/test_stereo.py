@@ -6,7 +6,7 @@ import cv2
 import numpy as np
 
 from mvg.basic import SE3, homogenize
-from mvg.camera import project_points
+from mvg.camera import Camera
 from mvg.stereo import (
     AffinityRecoverySolver,
     Fundamental,
@@ -130,13 +130,11 @@ def test_two_view_reprojection_error(
     T_RL, points_3d, points_3d_inlier_mask, T_RL_candidates, all_inlier_masks = _get_R_t(
         R1_RL, R2_RL, t_R, K, points_inliers_L, points_inliers_R
     )
+    camera = Camera(camera_matrix)
+    reprojected_L = camera.project_points(points_3d[points_3d_inlier_mask])
 
-    reprojected_L = project_points(
-        object_points_W=points_3d[points_3d_inlier_mask], camera_matrix=camera_matrix
-    )
-    reprojected_R = project_points(
-        object_points_W=points_3d[points_3d_inlier_mask], camera_matrix=camera_matrix, T_CW=T_RL
-    )
+    camera = Camera(camera_matrix, T=T_RL)
+    reprojected_R = camera.project_points(points_3d[points_3d_inlier_mask])
 
     reprojected_diff_L = reprojected_L - points_inliers_L[points_3d_inlier_mask]
     reprojected_diff_R = reprojected_R - points_inliers_R[points_3d_inlier_mask]
