@@ -10,7 +10,7 @@ import cv2
 from itertools import product
 
 from scipy.optimize import least_squares
-from scipy.spatial.transform.rotation import Rotation
+from scipy.spatial.transform import Rotation
 
 import numpy as np
 
@@ -26,7 +26,7 @@ from mvg.basic import (
 class Fundamental:
     """This class implements methods for computing fundamental (as well as essential) matrix.
 
-    The epipolar coplanarity constraint can be expressed as the equations below as
+    The epipolar co-planarity constraint can be expressed as the equations below as
 
     Here, x_L and x_R are the corresponding pixel coordinates in the frame (L) and (R) respectively,
     K_L and L_R is the camera matrices. R_LR is the relative orientation of frame (R) expressed in frame (L),
@@ -76,7 +76,7 @@ class Fundamental:
 
     @staticmethod
     def _linear_least_square_eight_point(*, x_L: np.ndarray, x_R: np.ndarray):
-        """Solve homogenize linear equations
+        """Solve homogeneous linear equations
 
         Since the objective function is A @ f = 0, w/o loss of generality,
         we can choose to set one of f to be 0, and solve the linear system.

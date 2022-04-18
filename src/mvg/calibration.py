@@ -1,13 +1,19 @@
 #!/usr/bin/env python3
+""" This module implements camera calibration process.
+
+TODO: Implement tangential distortion calibration.
+"""
+
+import math
+from enum import IntEnum
+from typing import List, Optional, Tuple
+
 import cv2
 import numpy as np
-import math
-
-from typing import List, Optional, Tuple
-from scipy.spatial.transform import Rotation
 from scipy.optimize import least_squares
-from mvg import basic, homography, camera
-from enum import IntEnum
+from scipy.spatial.transform import Rotation
+
+from mvg import basic, camera, homography
 
 
 def get_chessboard_object_points(*, rows: int, cols: int, grid_size: float):
@@ -236,7 +242,7 @@ class _ZhangsMethod:
         camera_matrix = components[0]
         radial_distortion_model = components[1]
         all_extrinsics_array = components[2]
-        residuls = []
+        residuals = []
         for i in range(len(all_image_points)):
             image_points = all_image_points[i]
             T_CW = basic.SE3.from_rotvec_pose(all_extrinsics_array[i])
@@ -246,10 +252,10 @@ class _ZhangsMethod:
                 T_CW=T_CW,
                 radial_distortion_model=radial_distortion_model,
             )
-            residuls.append(image_points - reprojected)
+            residuals.append(image_points - reprojected)
 
-        residuls = np.asarray(residuls).reshape(-1)
-        return residuls
+        residuals = np.asarray(residuals).reshape(-1)
+        return residuals
 
     @staticmethod
     def _bundle_adjustment(
@@ -362,6 +368,8 @@ class IntrinsicsCalibration:
     ):
         if method == IntrinsicsCalibration.Method.kZhangsMethod:
             return _ZhangsMethod.calibrate(image_points, object_points, debug)
+
+        raise NotImplementedError(f"Not supported calibration method {method}!")
 
 
 class StereoCalibration:
