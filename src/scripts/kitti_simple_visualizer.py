@@ -5,6 +5,7 @@ import argparse
 from pathlib import Path
 
 import matplotlib.pyplot as plt
+import pyvista as pv
 from mvg.models import kitti
 
 
@@ -24,6 +25,11 @@ def _main(drive_path, calibration_path, frame_index):
         plt.imshow(image.data)
     plt.tight_layout()
     plt.show()
+
+    scan = drive_data.read_lidar_scan([frame_index])[0]
+    plotter = pv.Plotter()
+    plotter.add_points(scan.points)
+    plotter.show()
 
 
 if __name__ == "__main__":
