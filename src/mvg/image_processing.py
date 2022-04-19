@@ -13,6 +13,14 @@ def resize(image, ratio=0.5):
 @dataclass
 class Image:
     data: np.ndarray
+    timestamp: float = -1.0
+
+    def __post_init__(self):
+        self._size = np.asarray(self.data.shape)[[1, 0]]
+
+    @property
+    def size(self):
+        return self._size
 
     @staticmethod
     def from_file(path: Path):
