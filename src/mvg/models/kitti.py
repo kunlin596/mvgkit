@@ -42,6 +42,7 @@ import cv2
 import numpy as np
 import tqdm
 from scipy.spatial.transform import Rotation
+from mvg import basic, camera, image_processing
 
 
 @dataclass
@@ -130,9 +131,12 @@ class IMUMeasurements:
 
 
 @dataclass
-class Image:
+class KittiImage:
     data: np.ndarray
     timestamp: float
+
+    def to_image(self):
+        return image_processing.Image(self.data, self.timestamp)
 
 
 @dataclass
@@ -280,7 +284,9 @@ class KittiDrive:
 
     def read_image(self, camera_id: int, indices: List[int], data_type: str = "sync"):
         data_id = "image_{:02d}".format(camera_id)
-        images = self._read_data(self._path / data_type, data_id, self._read_image, Image, indices)
+        images = self._read_data(
+            self._path / data_type, data_id, self._read_image, KittiImage, indices
+        )
         return images
 
     def read_lidar_scan(self, indices: List[int], data_type: str = "sync"):
@@ -309,6 +315,15 @@ class KittiCameraCalibration:
 
     image_size: np.ndarray
     P: np.ndarray
+
+    def get_camera(self):
+        dcoeff = self.unrectified_distortion_coefficients
+        return camera.Camera(
+            K=camera.CameraMatrix.from_matrix(self.unrectified_camera_matrix),
+            k=camera.RadialDistortionModel(dcoeff[0], dcoeff[1], dcoeff[4]),
+            p=camera.TangentialDistortionModel(dcoeff[2], dcoeff[3]),
+            T=basic.SE3(self.R, self.t),
+        )
 
 
 @dataclass
