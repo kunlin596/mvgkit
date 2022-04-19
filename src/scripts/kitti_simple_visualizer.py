@@ -11,15 +11,35 @@ from mvg.models import kitti
 
 def _main(drive_path, calibration_path, frame_index):
     drive_data = kitti.KittiDrive(Path(drive_path))
-    # calibration_data = kitti.KittiCalibration(Path(calibration_path))
+    calibration_data = kitti.KittiCalibration(Path(calibration_path))
 
-    images = [
-        drive_data.read_image(camera_id=index, indices=[frame_index])[0] for index in range(4)
-    ]
+    images = {
+        index: drive_data.read_image(camera_id=index, indices=[frame_index])[0].to_image()
+        for index in range(4)
+    }
+
+    cameras = {
+        camera_id: camera_calibration.get_camera()
+        for camera_id, camera_calibration in calibration_data.stereo_calibration.calibrations.items()
+    }
+
+    undistorted_images = []
+    for camera_id, image in images.items():
+        camera = cameras[camera_id]
+        undistorted = camera.undistort_image(image, 1.0)
+        undistorted_images.append(undistorted)
 
     plt.figure(0)
     plt.suptitle(f"Camera Images, {Path(drive_path).name}, frame_index={frame_index}")
-    for i, image in enumerate(images):
+    for i, image in images.items():
+        plt.subplot(2, 2, i + 1)
+        plt.title(f"Camera {i}, timestamp={image.timestamp}")
+        plt.imshow(image.data)
+    plt.tight_layout()
+
+    plt.figure(1)
+    plt.suptitle(f"Camera Images, {Path(drive_path).name}, frame_index={frame_index}")
+    for i, image in enumerate(undistorted_images):
         plt.subplot(2, 2, i + 1)
         plt.title(f"Camera {i}, timestamp={image.timestamp}")
         plt.imshow(image.data)

@@ -13,6 +13,7 @@ py_library(
 py_library(
     name = "camera",
     srcs = ["camera.py"],
+    deps = ["//mvg:image_processing"],
 )
 
 py_library(

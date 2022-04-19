@@ -6,5 +6,8 @@ py_binary(
 py_binary(
     name = "kitti_simple_visualizer",
     srcs = ["kitti_simple_visualizer.py"],
-    deps = ["//mvg/models:kitti"],
+    deps = [
+        "//mvg:image_processing",
+        "//mvg/models:kitti",
+    ],
 )
