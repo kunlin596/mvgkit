@@ -4,14 +4,13 @@ import json
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Optional
-from mvg.stereo import Fundamental
-from pytest import fixture
 
 import numpy as np
-
-from mvg.features import SIFT, Matcher
 from mvg.camera import CameraMatrix
+from mvg.features import SIFT, Matcher
 from mvg.image_processing import Image
+from mvg.stereo import Fundamental
+from pytest import fixture
 
 
 @dataclass

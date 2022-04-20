@@ -123,14 +123,8 @@ def homogeneous_transformation(R: np.ndarray, t: np.ndarray):
 
 @dataclass
 class SE3:
-    R: Optional[Rotation] = None
-    t: Optional[np.ndarray] = None
-
-    def __post_init__(self):
-        if self.R is None:
-            self.R = Rotation.from_quat([0.0, 0.0, 0.0, 1.0])
-        if self.t is None:
-            self.t = np.array([0.0, 0.0, 0.0])
+    R: Optional[Rotation] = Rotation.from_quat([0.0, 0.0, 0.0, 1.0])
+    t: Optional[np.ndarray] = np.array([0.0, 0.0, 0.0])
 
     @staticmethod
     def from_quat_pose(pose: np.ndarray):

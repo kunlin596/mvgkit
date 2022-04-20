@@ -140,7 +140,7 @@ class KittiImage:
 
 
 @dataclass
-class LiDARScan:
+class KittiLiDARScan:
     """
     Here, data contains 4*num values, where the first 3 values correspond to
     x,y and z, and the last value is the reflectance information. All scans
@@ -291,7 +291,11 @@ class KittiDrive:
 
     def read_lidar_scan(self, indices: List[int], data_type: str = "sync"):
         scan = self._read_data(
-            self._path / data_type, "velodyne_points", self._read_lidar_scan, LiDARScan, indices
+            self._path / data_type,
+            "velodyne_points",
+            self._read_lidar_scan,
+            KittiLiDARScan,
+            indices,
         )
         return scan
 
@@ -309,14 +313,13 @@ class KittiCameraCalibration:
     unrectified_camera_matrix: np.ndarray
     unrectified_distortion_coefficients: np.ndarray
 
-    R: Rotation
-    t: np.ndarray
+    T: basic.SE3
     R_rectification: Rotation
 
     image_size: np.ndarray
     P: np.ndarray
 
-    def get_camera(self):
+    def get_unrectified_camera(self):
         dcoeff = self.unrectified_distortion_coefficients
         return camera.Camera(
             K=camera.CameraMatrix.from_matrix(self.unrectified_camera_matrix),
@@ -324,6 +327,10 @@ class KittiCameraCalibration:
             p=camera.TangentialDistortionModel(dcoeff[2], dcoeff[3]),
             T=basic.SE3(self.R, self.t),
         )
+
+    def get_rectified_camera(self):
+        # TODO
+        pass
 
 
 @dataclass
@@ -360,8 +367,7 @@ class KittiLiDARCalibration:
     """
 
     timestamp: float
-    R: Rotation
-    t: np.ndarray
+    T: basic.SE3
     delta_f: np.ndarray
     delta_c: np.ndarray
 
@@ -376,8 +382,7 @@ class KittiIMUCalibration:
     """
 
     timestamp: float
-    R: Rotation
-    t: np.ndarray
+    T: basic.SE3
 
 
 class KittiCalibration:
@@ -422,8 +427,7 @@ class KittiCalibration:
     def _process_lidar_to_cam(data):
         return KittiLiDARCalibration(
             timestamp=data["calib_time"],
-            R=Rotation.from_matrix(data["R"].reshape(3, 3)),
-            t=data["T"],
+            T=basic.SE3(R=Rotation.from_matrix(data["R"].reshape(3, 3)), t=data["T"]),
             delta_f=data["delta_f"],
             delta_c=data["delta_c"],
         )
@@ -434,8 +438,7 @@ class KittiCalibration:
             unrectified_image_size=data["S"].astype(np.int32),
             unrectified_camera_matrix=data["K"].reshape(3, 3),
             unrectified_distortion_coefficients=data["D"].reshape(5),
-            R=Rotation.from_matrix(data["R"].reshape(3, 3)),
-            t=data["T"],
+            T=basic.SE3(R=Rotation.from_matrix(data["R"].reshape(3, 3)), t=data["T"]),
             image_size=data["S_rect"].astype(np.int32),
             R_rectification=Rotation.from_matrix(data["R_rect"].reshape(3, 3)),
             P=data["P_rect"].reshape(3, 4),
@@ -470,8 +473,7 @@ class KittiCalibration:
     def _process_imu_to_lidar(data):
         return KittiIMUCalibration(
             timestamp=data["calib_time"],
-            R=Rotation.from_matrix(data["R"].reshape(3, 3)),
-            t=data["T"],
+            T=basic.SE3(R=Rotation.from_matrix(data["R"].reshape(3, 3)), t=data["T"]),
         )
 
     @staticmethod

@@ -29,6 +29,7 @@ py_library(
 py_library(
     name = "stereo",
     srcs = ["stereo.py"],
+    deps = ["//mvg:homography"],
 )
 
 py_library(

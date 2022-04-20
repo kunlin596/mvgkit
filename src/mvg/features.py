@@ -101,7 +101,6 @@ class Matcher:
 
     @staticmethod
     def match(
-        *,
         descriptors1: np.ndarray,
         descriptors2: np.ndarray,
         index_params: Optional[Dict] = None,
