@@ -128,10 +128,17 @@ class Camera:
     # Extrinsics, transforms the points in reference frame to camera frame.
     T: Optional[SE3] = SE3()
 
+    def __post_init__(self):
+        self._P = self.K.as_matrix() @ self.T.as_augmented_matrix()
+
     @property
     def P(self):
         """Camera projection matrix."""
-        return self.K.as_matrix() @ self.T.as_augmented_matrix()
+        return self._P
+
+    @staticmethod
+    def from_projection_matrix(self):
+        pass
 
     def project_points(self, points_W, distort=False):
         """Project points in world frame to image points."""

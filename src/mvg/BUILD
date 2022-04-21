@@ -24,11 +24,16 @@ py_library(
 py_library(
     name = "homography",
     srcs = ["homography.py"],
+    deps = ["//mvg:basic"],
 )
 
 py_library(
     name = "stereo",
     srcs = ["stereo.py"],
+    deps = [
+        "//mvg:basic",
+        "//mvg:homography",
+    ],
 )
 
 py_library(
