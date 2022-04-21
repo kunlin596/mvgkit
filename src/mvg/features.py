@@ -1,7 +1,9 @@
 #!/usr/bin/env python3
 """This module includes various common image features."""
+
 from dataclasses import dataclass
-from typing import List, Optional, Dict
+from typing import Dict, List, Optional
+
 import cv2
 import numpy as np
 
@@ -101,7 +103,6 @@ class Matcher:
 
     @staticmethod
     def match(
-        *,
         descriptors1: np.ndarray,
         descriptors2: np.ndarray,
         index_params: Optional[Dict] = None,

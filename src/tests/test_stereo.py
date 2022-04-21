@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
 
 from math import sqrt
+
 import cv2
-
 import numpy as np
-
 from mvg.basic import SE3, homogenize
 from mvg.camera import Camera
+from mvg.homography import Homography2d
 from mvg.stereo import (
     AffinityRecoverySolver,
     Fundamental,
@@ -15,10 +15,8 @@ from mvg.stereo import (
     decompose_essential_matrix,
     triangulate,
 )
-from mvg.homography import Homography2d
 
 from stereo_data_fixtures import StereoDataPack
-
 
 np.set_printoptions(suppress=True, precision=7, linewidth=120)
 
