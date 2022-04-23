@@ -93,7 +93,6 @@ class Matcher:
         self._search_params = search_params
         if self._search_params is None:
             self._search_params = dict(checks=50)
-
         self._matcher = cv2.FlannBasedMatcher(self._index_params, self._search_params)
 
     def __call__(self, descriptors1, descriptors2, k: Optional[int] = None):
