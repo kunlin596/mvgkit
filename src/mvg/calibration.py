@@ -303,8 +303,9 @@ class _ZhangsMethod:
     def _decompose_parameters(*, param_array: np.ndarray, n_points: int):
         """Decompose parameters from optimization to their original forms"""
         camera_matrix = CameraMatrix(*param_array[:5])
-        radial_distortion_model = RadialDistortionModel(*param_array[5:8])
-        all_extrinsics_array = param_array[8:].reshape(n_points, 6)
+        camera_parameters_end_index = 5 + RadialDistortionModel.num_params
+        radial_distortion_model = RadialDistortionModel(*param_array[5:camera_parameters_end_index])
+        all_extrinsics_array = param_array[camera_parameters_end_index:].reshape(n_points, 6)
         return camera_matrix, radial_distortion_model, all_extrinsics_array
 
     @staticmethod

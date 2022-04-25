@@ -1,13 +1,23 @@
+load("@mvgkit_deps//:requirements.bzl", "requirement")
+
 package(default_visibility = ["//visibility:public"])
 
 py_library(
     name = "basic",
     srcs = ["basic.py"],
+    deps = [
+        requirement("numpy"),
+        requirement("sympy"),
+        requirement("scipy"),
+    ],
 )
 
 py_library(
     name = "calibration",
     srcs = ["calibration.py"],
+    deps = [
+        requirement("ipython"),
+    ],
 )
 
 py_library(
