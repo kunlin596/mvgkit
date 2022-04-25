@@ -34,6 +34,8 @@ class RadialDistortionModel:
     k5: float = 0.0
     k6: float = 0.0
 
+    num_params: int = 6
+
     def get_coord_coeffs(self, image_points):
         r2 = np.linalg.norm(image_points, axis=1) ** 2
         r4 = r2**2
@@ -51,6 +53,7 @@ class TangentialDistortionModel:
 
     p1: float = 0.0
     p2: float = 0.0
+    num_params: int = 2
 
     def get_coord_coeffs(self, image_points):
         r2 = np.linalg.norm(image_points, axis=1) ** 2
