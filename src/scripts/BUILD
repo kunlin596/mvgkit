@@ -1,3 +1,5 @@
+load("@mvgkit_deps//:requirements.bzl", "requirement")
+
 py_binary(
     name = "feature_extractor",
     srcs = ["feature_extractor.py"],
@@ -20,5 +22,17 @@ py_binary(
         "//mvg:image_processing",
         "//mvg:stereo",
         "//mvg/models:kitti",
+    ],
+)
+
+py_binary(
+    name = "run_optical_flow",
+    srcs = ["run_optical_flow.py"],
+    deps = [
+        "//mvg:features",
+        "//mvg/algorithms:optical_flow",
+        requirement("ipython"),
+        requirement("matplotlib"),
+        requirement("opencv-python-headless"),
     ],
 )

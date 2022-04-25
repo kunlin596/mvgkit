@@ -46,4 +46,7 @@ py_library(
 py_library(
     name = "image_processing",
     srcs = ["image_processing.py"],
+    deps = [
+        requirement("opencv-python-headless"),
+    ],
 )

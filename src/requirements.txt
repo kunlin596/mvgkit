@@ -34,9 +34,15 @@ asttokens
 executing
 six
 
+matplotlib
+cycler
+fonttools
+python_dateutil
+pillow
+kiwisolver
+
 numpy==1.22.3
 scipy==1.8
 sympy==1.8
-matplotlib==3.4.2
 # FIXME: GitHub doesn't have VTK using pip.
 pyvista==0.34.0
