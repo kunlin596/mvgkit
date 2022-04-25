@@ -1,6 +1,5 @@
-#!/usr/bin/env python3
-
 import json
+import os
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Optional
@@ -10,7 +9,13 @@ from mvg.camera import CameraMatrix
 from mvg.features import SIFT, Matcher
 from mvg.image_processing import Image
 from mvg.stereo import Fundamental
-from pytest import fixture
+
+# FIXME: Put these into conf files.
+WORKSPACE_PATH = Path(os.path.dirname(__file__))
+DATA_ROOT_PATH = WORKSPACE_PATH / "data"
+intrinsics_rms_threshold = 2.6
+fundamental_rms_threshold = 1.5
+stereo_reprojection_rms_threshold = 0.5
 
 
 @dataclass
@@ -26,8 +31,7 @@ class StereoDataPack:
     inlier_mask: Optional[np.ndarray] = None
 
 
-@fixture(scope="package")
-def leuven_stereo_data_pack(data_root_path):
+def get_leuven_stereo_data_pack():
     manual_points_L = np.array(
         [
             [75, 297],
@@ -62,7 +66,7 @@ def leuven_stereo_data_pack(data_root_path):
         dtype=np.float32,
     )
 
-    fundamental_root_path = Path(data_root_path) / "fundamental"
+    fundamental_root_path = Path(DATA_ROOT_PATH) / "fundamental"
     with open(fundamental_root_path / "meta.json", "r") as f:
         meta = json.load(f)
     image_L = Image.from_file(str(fundamental_root_path / meta["left"])).data
@@ -93,9 +97,8 @@ def leuven_stereo_data_pack(data_root_path):
     )
 
 
-@fixture(scope="package")
-def aloe_stereo_data_pack(data_root_path):
-    root_path = Path(data_root_path) / "stereo" / "aloe"
+def get_aloe_stereo_data_pack():
+    root_path = Path(DATA_ROOT_PATH) / "stereo" / "aloe"
     with open(root_path / "meta.json", "r") as f:
         meta = json.load(f)
     image_L = Image.from_file(str(root_path / meta["left"])).resize(0.4).data
@@ -142,9 +145,8 @@ def aloe_stereo_data_pack(data_root_path):
     )
 
 
-@fixture(scope="package")
-def book_stereo_data_pack(data_root_path):
-    root_path = Path(data_root_path) / "stereo" / "book"
+def get_book_stereo_data_pack():
+    root_path = Path(DATA_ROOT_PATH) / "stereo" / "book"
     with open(root_path / "meta.json", "r") as f:
         meta = json.load(f)
     image_L = Image.from_file(root_path / meta["left"]).data
