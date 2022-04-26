@@ -3,6 +3,7 @@ import os
 import unittest
 from pathlib import Path
 
+import numpy as np
 from mvg.calibration import (
     IntrinsicsCalibration,
     compute_reprejection_error,
@@ -81,4 +82,5 @@ class CalibrationTest(unittest.TestCase):
 
 
 if __name__ == "__main__":
+    np.random.seed(42)
     unittest.main()

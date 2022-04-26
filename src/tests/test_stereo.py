@@ -284,4 +284,5 @@ class TestStereo(unittest.TestCase):
 
 
 if __name__ == "__main__":
+    np.random.seed(42)
     unittest.main()
