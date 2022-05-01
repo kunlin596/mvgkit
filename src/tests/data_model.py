@@ -77,11 +77,11 @@ def get_leuven_stereo_data_pack():
     print("Computing feature points and their matches on left and right images...")
     keypoints_L, descriptors_L = SIFT.detect(image_L)
     keypoints_R, descriptors_R = SIFT.detect(image_R)
-    matches = Matcher.match(descriptors1=descriptors_L, descriptors2=descriptors_R)
-    points_L, points_R, _ = Matcher.get_matched_points(
-        keypoints_L, keypoints_R, matches, dist_threshold=0.8
+    query_indices, train_indices = Matcher.match(
+        descriptors1=descriptors_L, descriptors2=descriptors_R
     )
-
+    points_L = np.asarray([kp.pt for kp in keypoints_L[query_indices]])
+    points_R = np.asarray([kp.pt for kp in keypoints_R[train_indices]])
     F_RL, inlier_mask = Fundamental.compute(x_L=points_L, x_R=points_R)
 
     return StereoDataPack(
@@ -126,10 +126,11 @@ def get_aloe_stereo_data_pack():
         #     sigma=0.8,
         # ),
     )
-    matches = Matcher.match(descriptors1=descriptors_L, descriptors2=descriptors_R)
-    points_L, points_R, _ = Matcher.get_matched_points(
-        keypoints_L, keypoints_R, matches, dist_threshold=0.8
+    query_indices, train_indices = Matcher.match(
+        descriptors1=descriptors_L, descriptors2=descriptors_R
     )
+    points_L = np.asarray([kp.pt for kp in keypoints_L[query_indices]])
+    points_R = np.asarray([kp.pt for kp in keypoints_R[train_indices]])
     F_RL, inlier_mask = Fundamental.compute(x_L=points_L, x_R=points_R)
 
     return StereoDataPack(
