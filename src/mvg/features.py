@@ -1,7 +1,10 @@
 #!/usr/bin/env python3
 """This module includes various common image features."""
 
+import os
+import pickle
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Dict, List, Optional
 
 import cv2
@@ -54,7 +57,8 @@ class SIFT:
 
     @staticmethod
     def detect(image: np.ndarray, options: Optional[Options] = None):
-        return SIFT(options=options)(image)
+        keypoints, descriptors = SIFT(options=options)(image)
+        return np.asarray(keypoints), descriptors
 
     @staticmethod
     def draw(image: np.ndarray, keypoints: list):
@@ -108,21 +112,19 @@ class Matcher:
         search_params: Optional[Dict] = None,
         k: Optional[int] = None,
     ):
-        return Matcher(index_params, search_params)(
+        matches = Matcher(index_params, search_params)(
             descriptors1.astype(np.float32), descriptors2.astype(np.float32), k
         )
 
-    @staticmethod
-    def get_matched_points(keypoints1, keypoints2, matches, dist_threshold=0.8):
-        points1 = []
-        points2 = []
-        good_matches = []
-        for m, n in matches:
+        # FIXME
+        dist_threshold = 0.75
+        query_indices = []
+        train_indices = []
+        for (m, n) in matches:
             if m.distance < dist_threshold * n.distance:
-                good_matches.append(m)
-                points1.append(keypoints1[m.queryIdx].pt)
-                points2.append(keypoints2[m.trainIdx].pt)
-        return np.asarray(points1), np.asarray(points2), good_matches
+                query_indices.append(m.queryIdx)
+                train_indices.append(m.trainIdx)
+        return query_indices, train_indices
 
     @staticmethod
     def draw(
@@ -135,3 +137,13 @@ class Matcher:
         draw_params=None,
     ):
         return cv2.drawMatchesKnn(image1, keypoints1, image2, keypoints2, matches, None)
+
+
+def get_feature_iter(input_dir):
+    for filename in os.listdir(input_dir):
+        if Path(filename).suffix != ".feat":
+            continue
+
+        with open(input_dir / filename, "rb") as f:
+            keypoints, descriptors = pickle.load(f)
+            yield keypoints, descriptors

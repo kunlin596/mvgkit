@@ -2,6 +2,9 @@ tqdm
 pytest
 flake8
 opencv-python-headless
+numpy==1.22.3
+scipy==1.8
+sympy==1.8
 
 # FIXME: Fix these imports
 mpmath
@@ -41,8 +44,10 @@ python_dateutil
 pillow
 kiwisolver
 
-numpy==1.22.3
-scipy==1.8
-sympy==1.8
+plyfile
+
 # FIXME: GitHub doesn't have VTK using pip.
-pyvista==0.34.0
+# pyvista
+# appdirs
+# imageio
+# scooby
