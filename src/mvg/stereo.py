@@ -194,7 +194,7 @@ class Fundamental:
         Technical Report RR-2927, INRIA, 1996.
         """
         try:
-            print("Optimizing F...")
+            # print("Optimizing F...")
             result = least_squares(
                 fun=Fundamental._residual,
                 x0=initial_F_RL.reshape(-1),

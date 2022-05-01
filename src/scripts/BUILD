@@ -9,6 +9,15 @@ py_binary(
 )
 
 py_binary(
+    name = "naive_sfm",
+    srcs = ["naive_sfm.py"],
+    deps = [
+        "//mvg:sfm",
+        "//mvg/models:kitti",
+    ],
+)
+
+py_binary(
     name = "kitti_downloader",
     srcs = ["kitti_downloader.py"],
 )

@@ -201,3 +201,8 @@ class Camera:
             x, y, w, h = roi
             undistorted = undistorted[y : y + h, x : x + w]
         return image_processing.Image(undistorted, image.timestamp)
+
+
+@dataclass
+class OrthographicCamera:
+    T: SE3
