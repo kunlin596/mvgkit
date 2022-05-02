@@ -52,6 +52,16 @@ py_library(
 )
 
 py_library(
+    name = "streamer",
+    srcs = ["streamer.py"],
+    deps = [
+        "//mvg:features",
+        "//mvg:image_processing",
+        requirement("opencv-python-headless"),
+    ],
+)
+
+py_library(
     name = "sfm",
     srcs = ["sfm.py"],
     deps = [
@@ -59,6 +69,7 @@ py_library(
         "//mvg:camera",
         "//mvg:features",
         "//mvg:stereo",
+        "//mvg:streamer",
         "//mvg/mapping:frame",
         "//mvg/mapping:reconstruction",
         "//mvg/mapping:visual_odometry",

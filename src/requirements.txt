@@ -46,8 +46,24 @@ kiwisolver
 
 plyfile
 
-# FIXME: GitHub doesn't have VTK using pip.
-# pyvista
-# appdirs
-# imageio
-# scooby
+pyvistaqt
+pyvista
+qtpy
+appdirs
+imageio
+scooby
+vtk
+wslink
+aiohttp
+aiosignal
+charset_normalizer
+yarl
+frozenlist
+async_timeout
+multidict
+idna
+
+PySide6
+pyside6_essentials
+pyside6_addons
+shiboken6

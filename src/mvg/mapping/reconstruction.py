@@ -32,11 +32,15 @@ class Reconstruction:
         self._landmarks.append(landmark)
 
     def get_descriptors(self):
-        return np.vstack([landmark.descriptor for landmark in self._landmarks])
+        if len(self.landmarks):
+            return np.vstack([landmark.descriptor for landmark in self.landmarks])
+        return []
 
     def get_landmark_positions_G(self):
         # TODO: Let it return the pose vector.
-        return np.vstack([landmark.pose_G.t for landmark in self._landmarks])
+        if len(self.landmarks):
+            return np.vstack([landmark.pose_G.t for landmark in self.landmarks])
+        return []
 
     @property
     def frames(self) -> np.ndarray:
