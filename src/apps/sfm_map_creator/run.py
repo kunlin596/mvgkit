@@ -14,7 +14,7 @@ if __name__ == "__main__":
     parser.add_argument("--input-path", "-i", type=str, required=True, help="Input data path.")
     parser.add_argument("--output-path", "-o", type=str, required=True, help="Output result path.")
     parser.add_argument(
-        "--calibration-path", "-c", type=str, required=True, help="Input calibrartion data path."
+        "--calibration-path", "-c", type=str, required=True, help="Input calibration data path."
     )
     parser.add_argument(
         "--streamer-type",

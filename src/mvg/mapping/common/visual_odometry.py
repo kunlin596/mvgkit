@@ -9,8 +9,8 @@ import cv2
 import numpy as np
 from mvg.basic import SE3
 from mvg.features import Matcher
-from mvg.mapping.frame import Frame
-from mvg.mapping.reconstruction import Landmark, Reconstruction
+from mvg.mapping.common.frame import Frame
+from mvg.mapping.common.reconstruction import Landmark, Reconstruction
 from mvg.stereo import Fundamental, decompose_essential_matrix, triangulate
 from scipy.spatial import KDTree
 from scipy.spatial.transform import Rotation
@@ -168,6 +168,8 @@ class VisualOdometry:
             cameraMatrix=camera_matrix,
             distCoeffs=dist_coeffs,
             flags=cv2.SOLVEPNP_ITERATIVE,
+            reprojectionError=0.5,
+            iterationsCount=2000,
         )
 
         if not is_ok:

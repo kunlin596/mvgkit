@@ -6,7 +6,7 @@ from typing import List, Optional
 import numpy as np
 import plyfile
 from mvg.basic import SE3
-from mvg.mapping.frame import Frame
+from mvg.mapping.common.frame import Frame
 
 
 @dataclass

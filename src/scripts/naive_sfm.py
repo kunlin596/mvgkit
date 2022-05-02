@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
 
 import argparse
+import os
+import uuid
 from pathlib import Path
 
-from mvg import sfm
+from mvg.mapping.mapper import sfm
 from mvg.models import kitti
-import uuid
-import os
 
 
 def _main(input_dir, calibration_path, output_dir):
