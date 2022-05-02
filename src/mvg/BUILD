@@ -60,19 +60,3 @@ py_library(
         requirement("opencv-python-headless"),
     ],
 )
-
-py_library(
-    name = "sfm",
-    srcs = ["sfm.py"],
-    deps = [
-        "//mvg:basic",
-        "//mvg:camera",
-        "//mvg:features",
-        "//mvg:stereo",
-        "//mvg:streamer",
-        "//mvg/mapping:frame",
-        "//mvg/mapping:reconstruction",
-        "//mvg/mapping:visual_odometry",
-        requirement("opencv-python-headless"),
-    ],
-)

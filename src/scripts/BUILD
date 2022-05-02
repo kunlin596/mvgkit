@@ -12,7 +12,7 @@ py_binary(
     name = "naive_sfm",
     srcs = ["naive_sfm.py"],
     deps = [
-        "//mvg:sfm",
+        "//mvg/mapping/mapper:sfm",
         "//mvg/models:kitti",
     ],
 )

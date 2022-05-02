@@ -9,8 +9,8 @@ py_library(
         requirement("pyvistaqt"),
         requirement("PySide6"),
         requirement("IPython"),
-        "//mvg:sfm",
         "//mvg:streamer",
+        "//mvg/mapping/mapper:mapper_manager",
         "//mvg/models:kitti",
     ],
 )
@@ -21,6 +21,5 @@ py_binary(
     deps = [
         ":ui",
         requirement("PySide6"),
-        "//mvg:sfm",
     ],
 )
