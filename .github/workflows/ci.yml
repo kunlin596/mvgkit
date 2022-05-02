@@ -33,7 +33,7 @@ jobs:
       - name: Lint
         run: |
           # stop the build if there are Python syntax errors or undefined names
-          flake8 src/mvg src/tests src/scripts\
+          flake8 src \
             --show-source \
             --statistics \
             --ignore=E203,E501 \
