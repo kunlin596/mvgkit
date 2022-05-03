@@ -1,17 +1,34 @@
 import os
 import threading
 import uuid
+from dataclasses import dataclass
+from enum import IntEnum
 from pathlib import Path
 from typing import Any
 
+import cv2
+import numpy as np
 from mvg import streamer
-from mvg.mapping.mapper.mapper_manager import MapperManager, AvailableMapperType
+from mvg.mapping.mapper.mapper_manager import AvailableMapperType, MapperManager
 from mvg.models import kitti
 from PySide6 import QtCore, QtGui, QtWidgets
 from pyvistaqt import MainWindow, QtInteractor
 
 
+class _ExecutionMode(IntEnum):
+    Consecutive = 0
+    Step = 1
+
+
+@dataclass
+class _ExecutionState:
+    mode: _ExecutionMode = _ExecutionMode.Consecutive
+
+
 class MapCreatorWindow(MainWindow):
+
+    _image_update_signal = QtCore.Signal()
+
     def __init__(
         self,
         input_path: str,
@@ -25,7 +42,15 @@ class MapCreatorWindow(MainWindow):
         interactive: bool = True,
     ):
         QtWidgets.QMainWindow.__init__(self, parent)
-        self._init_ui()
+        try:
+            self._init_ui()
+        except AttributeError as e:
+            print(f"UI setup failed! e={e}.")
+            raise
+
+        self._image_update_signal.connect(self._show_image)
+
+        self._state = _ExecutionState()
 
         self._input_path = Path(input_path)
         self._calibration_path = Path(calibration_path)
@@ -97,6 +122,7 @@ class MapCreatorWindow(MainWindow):
             self._ipython_thread.join()
 
     def _run_mapping(self):
+        self._state.mode = _ExecutionMode.Consecutive
         self._mapper.run()
 
     def _update(self):
@@ -112,14 +138,53 @@ class MapCreatorWindow(MainWindow):
                 )
 
     def _step_run(self):
+        self._state.mode = _ExecutionMode.Step
         self._mapper.step_run()
+        self._image_update_signal.emit()
 
-    def _step_next(self):
-        self._mapper.step_run()
+    def _show_image(self):
+        from matplotlib.backends.backend_qt5agg import FigureCanvas
+        from matplotlib.backends.backend_qt5agg import NavigationToolbar2QT as NavigationToolbar
+        from matplotlib.figure import Figure
+
+        if self._view_image_dialog is None:
+            self._view_image_dialog = QtWidgets.QDialog()
+            view_image_main = QtWidgets.QWidget()
+            # FIXME: should the canvas be cached?
+            self._image_canvas = FigureCanvas(Figure(figsize=(5, 3)))
+            vboxlayout = QtWidgets.QVBoxLayout(view_image_main)
+            vboxlayout.setContentsMargins(0, 0, 0, 0)
+            vboxlayout.addWidget(NavigationToolbar(self._image_canvas, self))
+            vboxlayout.addWidget(self._image_canvas)
+            self._view_image_dialog.setLayout(vboxlayout)
+
+        fig = self._image_canvas.figure
+        fig.clear()
+        axes = fig.subplots(2, 1)
+        if len(self._streamer.frame_buffer) > 0:
+            ax = axes[0]
+            frame = self._streamer.frame_buffer[-1]
+            ax.set_title(Path(frame.uri).name)
+            ax.imshow(frame.data, cmap="gray")
+            keypoints = np.asarray([kp.pt for kp in frame.keypoints])
+            ax.scatter(keypoints[:, 0], keypoints[:, 1], s=5.0, alpha=0.5)
+
+        if len(self._streamer.frame_buffer) > 1:
+            ax = axes[1]
+            frame = self._streamer.frame_buffer[-2]
+            ax.set_title(Path(frame.uri).name)
+            ax.imshow(frame.data, cmap="gray")
+            keypoints = np.asarray([kp.pt for kp in frame.keypoints])
+            ax.scatter(keypoints[:, 0], keypoints[:, 1], s=5.0, alpha=0.5)
+
+        fig.tight_layout()
+        self._image_canvas.draw()
+        self._view_image_dialog.show()
 
     def _init_ui(self):
         self._main_frame = QtWidgets.QFrame()
         vboxlayout = QtWidgets.QVBoxLayout()
+        vboxlayout.setContentsMargins(0, 0, 0, 0)
 
         # add the pyvista interactor object
         self._plotter = QtInteractor(self._main_frame)
@@ -156,7 +221,10 @@ class MapCreatorWindow(MainWindow):
         step_button.triggered.connect(self._step_run)
         run_menu.addAction(step_button)
 
-        step_next_button = QtGui.QAction("Step Next", self)
-        step_next_button.setShortcut("Ctrl+N")
-        step_next_button.triggered.connect(self._step_next)
-        run_menu.addAction(step_next_button)
+        view_menu = main_menu.addMenu("View")
+        view_image_button = QtGui.QAction("Show Image", self)
+        view_image_button.setShortcut("Ctrl+V")
+        view_image_button.triggered.connect(self._show_image)
+        view_menu.addAction(view_image_button)
+
+        self._view_image_dialog = None
