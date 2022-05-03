@@ -25,6 +25,7 @@ if __name__ == "__main__":
         default="image",
     )
     parser.add_argument("--noui", "-n", action="store_true", help="No UI mode or not.")
+    parser.add_argument("--interactive", action="store_true", help="Interactive mode or not.")
 
     options = parser.parse_args()
 
@@ -35,5 +36,6 @@ if __name__ == "__main__":
         output_path=options.output_path,
         streamer_type=options.streamer_type,
         show=not options.noui,
+        interactive=options.interactive,
     )
     sys.exit(app.exec_())
