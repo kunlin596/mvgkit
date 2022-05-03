@@ -1,8 +1,11 @@
 #!/usr/bin/env python3
 
+import uuid
 from dataclasses import dataclass
-import cv2
 from pathlib import Path
+from typing import List, Optional
+
+import cv2
 import numpy as np
 
 
@@ -12,8 +15,12 @@ def resize(image, ratio=0.5):
 
 @dataclass
 class Image:
+    id: uuid.UUID
     data: np.ndarray
-    timestamp: float = -1.0
+    timestamp: float = -1.0  # TODO
+    uri: str = ""
+    keypoints: Optional[List[cv2.KeyPoint]] = None
+    descriptors: Optional[np.ndarray] = None
 
     def __post_init__(self):
         self._size = np.asarray(self.data.shape)[[1, 0]]
@@ -27,7 +34,8 @@ class Image:
         image_data = cv2.imread(str(path))
         # TODO(kun): Check image channel
         image_data = cv2.cvtColor(image_data, cv2.COLOR_BGR2RGB)
-        return Image(image_data)
+        return Image(id=uuid.uuid4(), data=image_data, uri=str(path))
 
     def resize(self, ratio=0.5):
-        return Image(resize(self.data, ratio))
+        # FIXME: should the resized image be considered as a new image?
+        return Image(id=self.id, data=resize(self.data, ratio), uri=self.uri)
