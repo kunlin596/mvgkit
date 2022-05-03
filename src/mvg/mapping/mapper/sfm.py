@@ -68,15 +68,19 @@ class IncrementalSFM:
         """TODO: virtualize this function."""
         self._ensure_reconstruction()
 
-        new_data = self._streamer.get()
+        frame_data = self._streamer.get()
 
-        if new_data is None:
+        if frame_data is None:
             return False
 
         if isinstance(self._streamer, streamer.FeatureFileStreamer):
-            keypoints, descriptors = new_data
+            keypoints, descriptors = frame_data
         elif isinstance(self._streamer, streamer.ImageFileStreamer):
-            keypoints, descriptors = features.SIFT.detect(new_data)
+            keypoints, descriptors = features.SIFT.detect(frame_data.data)
+            # FIXME: This is modifying the streamer's buffer.
+            # It's ok for now but should be changed in the future.
+            frame_data.keypoints = keypoints
+            frame_data.descriptors = descriptors
 
         f = frame.Frame(
             id=uuid.uuid4(),
@@ -107,15 +111,15 @@ class IncrementalSFM:
         try:
             i = 0
             while True:
-                new_data = self._streamer.get()
+                frame_data = self._streamer.get()
 
-                if new_data is None:
+                if frame_data is None:
                     break
 
                 if isinstance(self._streamer, streamer.FeatureFileStreamer):
-                    keypoints, descriptors = new_data
+                    keypoints, descriptors = frame_data
                 elif isinstance(self._streamer, streamer.ImageFileStreamer):
-                    keypoints, descriptors = features.SIFT.detect(new_data)
+                    keypoints, descriptors = features.SIFT.detect(frame_data.data)
 
                 f = frame.Frame(
                     id=uuid.uuid4(),
