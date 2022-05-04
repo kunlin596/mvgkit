@@ -20,6 +20,13 @@ class Frame:
     image: Optional[Image] = None
     points3d: Optional[np.ndarray] = None
 
+    def __repr__(self) -> str:
+        num_points3d = len(self.points3d) if self.points3d is not None else None
+        return (
+            f"Frame(id={self.id}, #keypoints={len(self.keypoints)}, "
+            f"#points3d={num_points3d}, pose_G={self.pose_G})"
+        )
+
     def has_point(self, point: np.ndarray):
         # TODO
         return True

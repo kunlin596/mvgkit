@@ -23,7 +23,7 @@ class ImageFileStreamer(StreamerBase):
 
     def _get_frame_reader(self):
         filenames = sorted(os.listdir(self._path))
-        for filename in filenames[::2]:
+        for filename in filenames[:3:1]:
             # FIXME: only support Kitti images.
             if len(filename) != 14 or not filename.endswith(".png"):
                 continue

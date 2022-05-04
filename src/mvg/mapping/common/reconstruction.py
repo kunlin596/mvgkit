@@ -1,7 +1,7 @@
 import uuid
 from dataclasses import dataclass
 from pathlib import Path
-from typing import List, Optional
+from typing import Dict, List, Tuple
 
 import numpy as np
 import plyfile
@@ -13,10 +13,8 @@ from mvg.mapping.common.frame import Frame
 class Landmark:
     id: uuid.UUID
     pose_G: SE3
-    descriptor: np.ndarray
-    frame_id: uuid.UUID
-    num_matches: Optional[int] = -1  # TODO
-    num_observations: Optional[int] = -1  # TODO
+    descriptor: np.ndarray  # TODO: Compute a representative from the observations
+    observations: Dict[int, Tuple[Frame, Dict]]
 
 
 class Reconstruction:
@@ -24,9 +22,14 @@ class Reconstruction:
         # TODO: Use pandas.DataFrame
         self._landmarks_G: List[Landmark] = list()
         self._frames: List[Frame] = list()
+        self._frame_index_lookup = dict()
 
     def add_frame(self, frame: Frame):
         self._frames.append(frame)
+        self._frame_index_lookup[frame.id] = len(self._frames) - 1
+
+    def get_frame_index_from_id(self, frame_id: uuid.UUID):
+        return self._frame_index_lookup.get(frame_id)
 
     def add_landmark_G(self, landmark: Landmark):
         self._landmarks_G.append(landmark)
@@ -55,10 +58,15 @@ class Reconstruction:
 
     def dump(self, path: Path):
         points = self.get_landmark_positions_G()
-        filepath = path / "reconstruction.ply"
-        print(f"Writing to {filepath}.")
+        model_filepath = path / "reconstruction.ply"
+        print(f"Writing model to {model_filepath}.")
         vertices = np.array(
             [tuple(e) for e in points], dtype=[("x", "<f4"), ("y", "<f4"), ("z", "<f4")]
         )
         el = plyfile.PlyElement.describe(vertices, "vertex")
-        plyfile.PlyData([el], text=True).write(filepath)
+        plyfile.PlyData([el], text=True).write(model_filepath)
+
+        trajectory_filepath = path / "trajectory.txt"
+        print(f"Writing trajectory to {trajectory_filepath}.")
+        poses = np.vstack([frame.pose_G.as_rotvec_pose() for frame in self._frames])
+        np.savetxt(trajectory_filepath, poses)

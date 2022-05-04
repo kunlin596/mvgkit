@@ -2,25 +2,25 @@
 """This module implement stereo vision related algorithms."""
 
 
-from math import pi, sqrt
 from dataclasses import dataclass
+from itertools import product
+from math import pi, sqrt
 from typing import Optional
 
 import cv2
-from itertools import product
-
+import numpy as np
 from scipy.optimize import least_squares
 from scipy.spatial.transform import Rotation
 
-import numpy as np
-
-from mvg.homography import Homography2d
 from mvg.basic import (
+    SE3,
     SkewSymmetricMatrix3d,
     get_isotropic_scaling_matrix_2d,
-    homogenize,
     get_line_points_in_image,
+    homogenize,
 )
+from mvg.camera import CameraMatrix
+from mvg.homography import Homography2d
 
 
 class Fundamental:
@@ -315,47 +315,6 @@ class Fundamental:
         plt.tight_layout()
         plt.show()
 
-    # @staticmethod
-    # def _assert_symbolic_A():
-    #     """This function is used for manual validation."""
-    #     import sympy as sym
-
-    #     x_L = np.array(np.r_[sym.symbols("x1 y1"), 1.0]).reshape(-1, 1)
-    #     x_R = np.array(np.r_[sym.symbols("x2 y2"), 1.0]).reshape(-1, 1)
-
-    #     F_RL = []
-    #     for row in range(1, 4):
-    #         for col in range(1, 4):
-    #             F_RL.append(sym.Symbol(f"f{row}{col}"))
-    #     F_RL = np.asarray(F_RL).reshape(3, 3)
-
-    #     eqn1 = sym.Matrix(x_R.T @ F_RL @ x_L)
-    #     eqn2 = sym.Matrix(x_L.T @ F_RL.T @ x_R)
-
-    #     A = np.kron(x_R, x_L)
-    #     f = F_RL.reshape(-1)
-    #     Af = A.T @ f
-    #     eqn3 = sym.Matrix(Af)
-
-    #     subs = dict(
-    #         x1=1,
-    #         x2=2,
-    #         y1=3,
-    #         y2=4,
-    #         f11=1,
-    #         f12=2,
-    #         f13=3,
-    #         f21=4,
-    #         f22=5,
-    #         f23=6,
-    #         f31=7,
-    #         f32=8,
-    #         f33=9,
-    #     )
-
-    #     assert eqn1.subs(subs) == eqn2.subs(subs)
-    #     assert eqn3.subs(subs) == eqn1.subs(subs)
-
 
 def decompose_essential_matrix(*, E_RL: np.ndarray):
     """Decompose essential matrix describing the change of frame from (L) to (R)."""
@@ -379,6 +338,44 @@ def decompose_essential_matrix(*, E_RL: np.ndarray):
 
     assert np.allclose(t_R @ R1_RL, t_R @ R2_RL)
     return R1_RL, R2_RL, t_R
+
+
+def cheirality_check(
+    image_points_L: np.ndarray,
+    image_points_R: np.ndarray,
+    R1_RL: Rotation,
+    R2_RL: Rotation,
+    t_R: np.ndarray,
+    K: CameraMatrix,
+):
+    P1 = np.hstack([K.as_matrix(), np.zeros((3, 1))])
+    camera_matrix = K.as_matrix()
+    T_candidates_RL = [
+        SE3.from_rotmat_tvec(R1_RL, t_R),
+        SE3.from_rotmat_tvec(R1_RL, -t_R),
+        SE3.from_rotmat_tvec(R2_RL, t_R),
+        SE3.from_rotmat_tvec(R2_RL, -t_R),
+    ]
+
+    best_T_RL = None
+    best_points_3d_L = None
+    best_inlier_mask = None
+    best_num_valid_points = -1
+
+    for T_RL in T_candidates_RL:
+        P2 = camera_matrix @ T_RL.as_augmented_matrix()
+        points_3d_L = triangulate(P1, P2, image_points_L, image_points_R)
+
+        inlier_mask = (points_3d_L[:, 2] > 0.0) & ((T_RL @ points_3d_L)[:, 2] > 0.0)
+        num_valid_points = np.count_nonzero(inlier_mask)
+
+        if num_valid_points > best_num_valid_points:
+            best_num_valid_points = num_valid_points
+            best_T_RL = T_RL
+            best_points_3d_L = points_3d_L
+            best_inlier_mask = inlier_mask
+
+    return best_T_RL, best_points_3d_L, best_inlier_mask
 
 
 def triangulate(P1, P2, points1, points2):
