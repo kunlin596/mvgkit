@@ -14,6 +14,9 @@ py_binary(
     deps = [
         "//mvg/mapping/mapper:sfm",
         "//mvg/models:kitti",
+        requirement("ipython"),
+        requirement("matplotlib"),
+        requirement("pyvista"),
     ],
 )
 

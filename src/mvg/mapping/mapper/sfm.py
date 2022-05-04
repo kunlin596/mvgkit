@@ -3,7 +3,7 @@
 import threading
 import uuid
 from dataclasses import dataclass
-from typing import Optional
+from typing import Dict, Optional
 
 import numpy as np
 from mvg import features, streamer
@@ -23,7 +23,13 @@ class IncrementalSFM:
         frame_count: int = 0
         fps: float = 0.0  # TODO
 
-    def __init__(self, *, streamer: streamer.StreamerBase, camera: Optional[Camera] = None):
+    def __init__(
+        self,
+        *,
+        streamer: streamer.StreamerBase,
+        camera: Optional[Camera] = None,
+        params: Optional[Dict] = None,
+    ):
         """
         Args:
             path (Path): path to image key point feature data folder
@@ -31,12 +37,17 @@ class IncrementalSFM:
         """
         self._streamer = streamer
         self._camera = camera
+
         if self._camera is None:
             self._camera = Camera()
 
+        if params is None:
+            params = dict()
+
         self._reconstruction = None
         self._reconstruction_lock = threading.Lock()
-        self._vo = None
+        print("Creating visual odometry object ...")
+        self._vo = visual_odometry.VisualOdometry(params.get("visual_odometry", dict()))
 
         self._state_lock = threading.Lock()
         self._reset_state()
@@ -60,9 +71,10 @@ class IncrementalSFM:
             if self._reconstruction is None:
                 print("Creating reconstruction (map) object...")
                 self._reconstruction = reconstruction.Reconstruction()
-        if self._vo is None:
-            print("Creating visual odometry object ...")
-            self._vo = visual_odometry.VisualOdometry()
+
+    @property
+    def cache(self):
+        return dict(visual_odometry=self._vo.cache)
 
     def step_run(self) -> bool:
         """TODO: virtualize this function."""
@@ -73,6 +85,7 @@ class IncrementalSFM:
         if frame_data is None:
             return False
 
+        image = None
         if isinstance(self._streamer, streamer.FeatureFileStreamer):
             keypoints, descriptors = frame_data
         elif isinstance(self._streamer, streamer.ImageFileStreamer):
@@ -81,6 +94,7 @@ class IncrementalSFM:
             # It's ok for now but should be changed in the future.
             frame_data.keypoints = keypoints
             frame_data.descriptors = descriptors
+            image = frame_data
 
         f = frame.Frame(
             id=uuid.uuid4(),
@@ -88,13 +102,15 @@ class IncrementalSFM:
             keypoints=np.asarray(keypoints),
             descriptors=descriptors,
             camera=self._camera,
+            image=image,
         )
 
-        print(
-            f"Adding {self.state.frame_count:>5d}-th frame, id={f.id} "
-            f"current map size: {len(self._reconstruction.landmarks):10d}."
-        )
         succeeded = self._vo.add_frame(reconstruction=self._reconstruction, frame=f)
+
+        print(
+            f"Added {self.state.frame_count:>5d}-th frame, id={f.id}, "
+            f"current map size: {len(self._reconstruction.landmarks_G):5d}."
+        )
 
         if not succeeded:
             False
@@ -116,10 +132,16 @@ class IncrementalSFM:
                 if frame_data is None:
                     break
 
+                image = None
                 if isinstance(self._streamer, streamer.FeatureFileStreamer):
                     keypoints, descriptors = frame_data
                 elif isinstance(self._streamer, streamer.ImageFileStreamer):
                     keypoints, descriptors = features.SIFT.detect(frame_data.data)
+                    # FIXME: This is modifying the streamer's buffer.
+                    # It's ok for now but should be changed in the future.
+                    frame_data.keypoints = keypoints
+                    frame_data.descriptors = descriptors
+                    image = frame_data
 
                 f = frame.Frame(
                     id=uuid.uuid4(),
@@ -127,13 +149,15 @@ class IncrementalSFM:
                     keypoints=np.asarray(keypoints),
                     descriptors=descriptors,
                     camera=self._camera,
+                    image=image,
                 )
 
-                print(
-                    f"Adding {i:>5d}-th frame, id={f.id} "
-                    f"current map size: {len(self._reconstruction.landmarks):10d}."
-                )
                 succeeded = self._vo.add_frame(reconstruction=self._reconstruction, frame=f)
+
+                print(
+                    f"Added {i:>5d}-th frame, id={f.id}, "
+                    f"current map size: {len(self._reconstruction.landmarks_G):5d}."
+                )
 
                 if not succeeded:
                     break

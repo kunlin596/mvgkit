@@ -146,6 +146,10 @@ class SE3:
         T[:3, 3] = self.t
         return T
 
+    @staticmethod
+    def identity():
+        return SE3.from_rotvec_pose(np.zeros(6))
+
     def as_augmented_matrix(self):
         return np.hstack([self.R.as_matrix(), self.t.reshape(-1, 1)])
 

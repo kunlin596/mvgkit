@@ -1,5 +1,5 @@
 from enum import IntEnum
-from typing import Optional
+from typing import Dict, Optional
 
 from mvg.camera import Camera
 from mvg.mapping.mapper import sfm
@@ -16,6 +16,7 @@ class MapperManager:
         mapper_type: AvailableMapperType,
         streamer: StreamerBase,
         camera: Optional[Camera] = None,
+        params: Optional[Dict] = None,
     ):
         """
         TODO: add custom configuration from input arguments for each mapper class.
@@ -30,4 +31,4 @@ class MapperManager:
             mapper_cls = sfm.IncrementalSFM
 
         if mapper_cls is not None:
-            return mapper_cls(streamer=streamer, camera=camera)
+            return mapper_cls(streamer=streamer, camera=camera, params=params)

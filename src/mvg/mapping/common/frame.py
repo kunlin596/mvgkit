@@ -18,6 +18,7 @@ class Frame:
     camera: Camera
     pose_G: SE3 = SE3.from_rotvec_pose(np.zeros(6))
     image: Optional[Image] = None
+    points3d: Optional[np.ndarray] = None
 
     def has_point(self, point: np.ndarray):
         # TODO

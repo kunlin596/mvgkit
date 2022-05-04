@@ -34,10 +34,10 @@ class SIFT:
 
     @dataclass
     class Options:
-        num_features: int = 20000
+        num_features: int = 10000
         num_octave_layers: Optional[int] = None
         contrast_threshold: float = 0.04
-        edge_threshold: float = 10
+        edge_threshold: float = 20
         sigma: float = 1.6
 
     def __init__(self, options: Optional[Options] = None):

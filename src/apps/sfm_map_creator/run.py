@@ -3,6 +3,7 @@
 """
 import argparse
 import sys
+import numpy as np
 
 from apps.sfm_map_creator.ui import MapCreatorWindow
 from PySide6 import QtWidgets
@@ -26,8 +27,12 @@ if __name__ == "__main__":
     )
     parser.add_argument("--noui", "-n", action="store_true", help="No UI mode or not.")
     parser.add_argument("--interactive", action="store_true", help="Interactive mode or not.")
+    parser.add_argument("--debug", action="store_true", help="Debug mode or not.")
 
     options = parser.parse_args()
+
+    if options.debug:
+        np.set_printoptions(suppress=True, precision=5)
 
     app = QtWidgets.QApplication([])
     window = MapCreatorWindow(
@@ -37,5 +42,6 @@ if __name__ == "__main__":
         streamer_type=options.streamer_type,
         show=not options.noui,
         interactive=options.interactive,
+        debug=options.debug,
     )
     sys.exit(app.exec_())
