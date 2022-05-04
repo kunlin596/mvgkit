@@ -7,6 +7,7 @@ from typing import Optional
 
 import cv2
 import numpy as np
+from mvg.algorithms.optical_flow import OpticalFlowLK
 from mvg.basic import SE3
 from mvg.features import Matcher
 from mvg.mapping.common.frame import Frame
@@ -28,19 +29,22 @@ class VisualOdometry:
     class Parameters:
         """Parameter class for visual odometry."""
 
+        # TODO
         # 2D features
-        num_features: int
-        scaling_factor: float
-        level_pyramid: int
+        # num_features: int
+        # scaling_factor: float
+        # level_pyramid: int
 
         # 2D feature matching
-        matching_ratio: float
+        # matching_ratio: float
 
         # VO state machine
-        max_num_tracking_failures: int
-        num_inliers_per_frame_pair: int
-        min_rotation_per_frame_pair: float
-        min_translation_per_frame_pair: float
+        # max_num_tracking_failures: int
+        # num_inliers_per_frame_pair: int
+        # min_rotation_per_frame_pair: float
+        # min_translation_per_frame_pair: float
+
+        debug: bool = False
 
     class State(IntEnum):
         """VO States."""
@@ -54,9 +58,13 @@ class VisualOdometry:
         if params is None:
             # TODO: add parameters
             pass
-        self._params = params
+        self._params = self.Parameters(**params)
         self._state = self.State.InitializingFirst
         self._num_failures = 0
+
+    @property
+    def params(self):
+        return self._params
 
     @staticmethod
     def _disambiguate_camera_pose(
@@ -68,8 +76,7 @@ class VisualOdometry:
         image_points_R: np.ndarray,
     ):
         """Find the correct camera pose from result from essential matrix decomposition."""
-        P1 = camera_matrix @ SE3.from_rotmat_tvec(np.eye(3), np.zeros(3)).as_augmented_matrix()
-
+        P1 = np.hstack([camera_matrix, np.zeros((3, 1))])
         T_RL_candidates = [
             SE3.from_rotmat_tvec(R1_RL, t_R),
             SE3.from_rotmat_tvec(R1_RL, -t_R),
@@ -81,6 +88,7 @@ class VisualOdometry:
         max_num_valid_points = -1
         best_T_RL = None
         best_points3d_L = None
+        best_inlier_mask = None
         for i, P2 in enumerate(P2_candidates):
             points3d_L = triangulate(P1, P2, image_points_L, image_points_R)
             # FIXME: determine min depth correctly.
@@ -91,63 +99,64 @@ class VisualOdometry:
                 max_num_valid_points = num_valid_points
                 best_T_RL = T_RL_candidates[i]
                 best_points3d_L = points3d_L
+                best_inlier_mask = inlier_mask
 
-        return best_T_RL, best_points3d_L
+        return best_T_RL, best_points3d_L, best_inlier_mask
 
     @staticmethod
-    def _initialize_reconstruction(reconstruction: Reconstruction):
-        """Initialize reconstruction using the first two frames."""
-        assert len(reconstruction.frames) == 2, "Need 2 frames to initialize map!"
+    def _estimate_stereo_pose(frame_R: Frame, frame_C: Frame):
+        keypoints_R = frame_R.keypoints
+        keypoints_C = frame_C.keypoints
 
-        f1 = reconstruction.frames[0]
-        f2 = reconstruction.frames[1]
+        descriptors_R = frame_R.descriptors
+        descriptors_C = frame_C.descriptors
 
-        keypoints_L = f1.keypoints
-        keypoints_R = f2.keypoints
+        query_indices, train_indices = Matcher.match(descriptors_R, descriptors_C)
 
-        descriptors_L = f1.descriptors
-        descriptors_R = f2.descriptors
+        matched_points_R = _keypoints_to_ndarray(keypoints_R[query_indices])
+        matched_points_C = _keypoints_to_ndarray(keypoints_C[train_indices])
 
-        query_indices, train_indices = Matcher.match(descriptors_L, descriptors_R)
+        F_CR, fundamental_inlier_mask = Fundamental.compute(
+            x_L=matched_points_R, x_R=matched_points_C
+        )
+        E_CR = frame_R.camera.K.as_matrix().T @ F_CR @ frame_C.camera.K.as_matrix()
+        R1_CR, R2_CR, t_C = decompose_essential_matrix(E_RL=E_CR)
 
-        matched_points_L = _keypoints_to_ndarray(keypoints_L[query_indices])
-        matched_points_R = _keypoints_to_ndarray(keypoints_R[train_indices])
-
-        F_RL, _ = Fundamental.compute(x_L=matched_points_L, x_R=matched_points_R)
-        # NOTE: Current implementation only support same camera.
-        E_RL = f1.camera.K.as_matrix().T @ F_RL @ f2.camera.K.as_matrix()
-        R1_RL, R2_RL, t_R = decompose_essential_matrix(E_RL=E_RL)
-
-        rel_pose_RL, points3d_L = VisualOdometry._disambiguate_camera_pose(
-            R1_RL=R1_RL,
-            R2_RL=R2_RL,
-            t_R=t_R,
-            camera_matrix=f1.camera.K.as_matrix(),
-            image_points_L=matched_points_L,
-            image_points_R=matched_points_R,
+        rel_pose_CR, points3d_R, inlier_mask_R = VisualOdometry._disambiguate_camera_pose(
+            R1_RL=R1_CR,
+            R2_RL=R2_CR,
+            t_R=t_C,
+            camera_matrix=frame_R.camera.K.as_matrix(),
+            image_points_L=matched_points_R[fundamental_inlier_mask],
+            image_points_R=matched_points_C[fundamental_inlier_mask],
         )
 
-        ref_image_points = f1.camera.project_points(points3d_L)
-        is_x_in_view = (0.0 < ref_image_points[:, 0]) & (ref_image_points[:, 0] < 1226.0)
-        is_y_in_view = (0.0 < ref_image_points[:, 1]) & (ref_image_points[:, 1] < 370.0)
-        is_points_in_view = is_x_in_view & is_y_in_view
+        return (
+            rel_pose_CR,
+            points3d_R[inlier_mask_R],
+            descriptors_R[query_indices][fundamental_inlier_mask][inlier_mask_R],
+        )
 
-        f2.pose_G = f1.pose_G @ rel_pose_RL.inv()
+    def _initialize_reconstruction(self, reconstruction: Reconstruction):
+        """Initialize reconstruction using the first two frames."""
+        assert len(reconstruction.frames) == 2, "Need two frames to initialize map!"
 
-        # TODO: Find ouf the best k keypoints
-        filtered_descriptors = descriptors_L[query_indices][is_points_in_view]
-        for i, point3d_L in enumerate(points3d_L[is_points_in_view]):
-
-            if point3d_L[-1] < 0.01 or point3d_L[-1] > 300.0:
-                # FIXME: negative points should not exist.
-                continue
-
-            reconstruction.add_landmark(
+        frame_R = reconstruction.frames[-2]
+        frame_C = reconstruction.frames[-1]
+        rel_pose_CR, points3d_R, descriptors_R = self._estimate_stereo_pose(frame_R, frame_C)
+        is_in_range = self._get_points3d_range_mask(points3d_R)
+        points3d_R = points3d_R[is_in_range]
+        descriptors_R = descriptors_R[is_in_range]
+        frame_C.pose_G = frame_R.pose_G @ rel_pose_CR.inv()
+        frame_R.points3d = points3d_R
+        points3d_G = frame_R.pose_G @ points3d_R
+        for i, point3d_G in enumerate(points3d_G):
+            reconstruction.add_landmark_G(
                 Landmark(
                     id=uuid.uuid4(),
-                    pose_G=SE3.from_rotvec_pose(np.r_[0.0, 0.0, 0.0, point3d_L]),
-                    descriptor=filtered_descriptors[i],
-                    frame_id=f1.id,
+                    pose_G=SE3.from_rotvec_pose(np.r_[0.0, 0.0, 0.0, point3d_G]),
+                    descriptor=descriptors_R[i],
+                    frame_id=frame_R.id,
                 )
             )
 
@@ -159,8 +168,8 @@ class VisualOdometry:
         dist_coeffs: Optional[np.ndarray] = None,
     ):
         """Solve for the transformation from world frame to camera frame."""
-        if dist_coeffs is None:
-            dist_coeffs = np.zeros(5)
+
+        assert len(object_points) >= 4, "Not enough points for solving pnp, need at least 4."
 
         is_ok, rvec, tvec, inliers = cv2.solvePnPRansac(
             objectPoints=object_points,
@@ -168,13 +177,18 @@ class VisualOdometry:
             cameraMatrix=camera_matrix,
             distCoeffs=dist_coeffs,
             flags=cv2.SOLVEPNP_ITERATIVE,
-            reprojectionError=0.5,
+            reprojectionError=1.0,
             iterationsCount=2000,
+            confidence=0.9,
         )
 
         if not is_ok:
             raise Exception("Solve PnP failed!")
 
+        print(f" - {'PnP inliers size':35s}: {len(inliers):5d}.")
+
+        # NOTE: no need, but included just to make it look nicer on terminal.
+        inliers = inliers.reshape(-1)
         rvec, tvec = cv2.solvePnPRefineLM(
             objectPoints=object_points[inliers],
             imagePoints=image_points[inliers],
@@ -184,91 +198,154 @@ class VisualOdometry:
             tvec=tvec,
         )
         pose = SE3.from_rotvec_pose(np.r_[rvec.reshape(-1), tvec.reshape(-1)])
-
         return pose
 
     @staticmethod
-    def _add_frame(reconstruction: Reconstruction, frame: Frame):
-        reconstruction.add_frame(frame)
-
-        # Get the latest 2 key frames.
-        cur_frame = reconstruction.frames[-1]
-        ref_frame = reconstruction.frames[-2]
-
-        # Get all points and descriptors from the existing reconstruction.
-        map_descriptors = reconstruction.get_descriptors()
-        landmark_positions_G = reconstruction.get_landmark_positions_G()
-
-        # Filter points in view.
-        ref_image_points = ref_frame.camera.project_points(
-            ref_frame.pose_G.inv() @ landmark_positions_G
-        )
-
+    def _get_image_point_visibility_mask(image_points):
         # FIXME: store image size in camera.
-        is_x_in_view = (0.0 < ref_image_points[:, 0]) & (ref_image_points[:, 0] < 1226.0)
-        is_y_in_view = (0.0 < ref_image_points[:, 1]) & (ref_image_points[:, 1] < 370.0)
-        is_points_in_view = is_x_in_view & is_y_in_view
+        is_x_in_view = (0.0 < image_points[:, 0]) & (image_points[:, 0] < 1226.0)
+        is_y_in_view = (0.0 < image_points[:, 1]) & (image_points[:, 1] < 370.0)
+        return is_x_in_view & is_y_in_view
 
-        filtered_map_descriptors = map_descriptors[is_points_in_view]
-        filtered_landmark_positions_G = landmark_positions_G[is_points_in_view]
+    @staticmethod
+    def _get_points3d_range_mask(points3d, max_val=20.0):
+        is_x_in_range = np.abs(points3d[:, 0]) < max_val
+        is_y_in_range = np.abs(points3d[:, 1]) < max_val
+        is_z_in_range = (0.01 < points3d[:, 2]) & (points3d[:, 2] < max_val)
+        return is_x_in_range & is_y_in_range & is_z_in_range
 
-        # Estimate new key frame pose.
-        query_indices, train_indices = Matcher.match(
-            filtered_map_descriptors, cur_frame.descriptors
+    @staticmethod
+    def _filter_visible_landmarks_in_frame_R(landmarks_G: np.ndarray, frame_R: Frame):
+        """Filter out the landmarks in frame (G) that is visible in frame (R)."""
+        landmark_positions_G = np.vstack([lm.pose_G.t for lm in landmarks_G])
+        front_mask = landmark_positions_G[:, -1] > 1.0
+        map_points3d_R = frame_R.pose_G.inv() @ landmark_positions_G[front_mask]
+        map_image_points_R = frame_R.camera.project_points(map_points3d_R)
+        is_in_view = VisualOdometry._get_image_point_visibility_mask(map_image_points_R)
+        return landmarks_G[front_mask][is_in_view]
+
+    @staticmethod
+    def _filter_consistent_landmarks_in_frame_R(
+        landmarks_G: np.ndarray,
+        frame_R: Frame,
+        reprojection_error_threshold=2.0,
+    ):
+        """Filter out the landmarks that have consistent descriptors in frame (R).
+
+        Match the reprojected landmarks in frame (R) and match it with the detected ones.
+        """
+        landmark_positions_G = np.vstack([lm.pose_G.t for lm in landmarks_G])
+        map_descriptors_G = np.vstack([landmark_G.descriptor for landmark_G in landmarks_G])
+        query_indices, train_indices = Matcher.match(map_descriptors_G, frame_R.descriptors)
+        map_points3d_R = frame_R.pose_G.inv() @ landmark_positions_G
+        map_image_points_R = frame_R.camera.project_points(map_points3d_R)
+        matched_map_image_points_R = map_image_points_R[query_indices]
+        keypoints_R = _keypoints_to_ndarray(frame_R.keypoints[train_indices])
+        reprojection = np.linalg.norm(matched_map_image_points_R - keypoints_R, axis=1)
+        reprojection_mask = reprojection < reprojection_error_threshold
+        return landmarks_G[query_indices][reprojection_mask]
+
+    @staticmethod
+    def _solve_new_pose(landmarks_G: np.ndarray, frame_R: Frame, frame_C: Frame):
+        if len(landmarks_G) < 4:
+            raise Exception("Not enough landmarks!")
+        map_descriptors_G = np.vstack([landmark_G.descriptor for landmark_G in landmarks_G])
+        query_indices, train_indices = Matcher.match(map_descriptors_G, frame_C.descriptors)
+        map_points3d_G = np.vstack([lm.pose_G.t for lm in landmarks_G[query_indices]])
+        map_points3d_R = frame_R.pose_G.inv() @ map_points3d_G
+        image_points_C = _keypoints_to_ndarray(frame_C.keypoints[train_indices])
+        rel_pose_CR = VisualOdometry._solve_pnp(
+            object_points=map_points3d_R,
+            image_points=image_points_C,
+            camera_matrix=frame_C.camera.K.as_matrix(),
         )
-        object_points_L = ref_frame.pose_G.inv() @ filtered_landmark_positions_G[query_indices]
+        return rel_pose_CR
 
-        rel_pose_RL = VisualOdometry._solve_pnp(
-            object_points=object_points_L,
-            image_points=_keypoints_to_ndarray(cur_frame.keypoints[train_indices]),
-            camera_matrix=frame.camera.K.as_matrix(),
-        )
+    @staticmethod
+    def _estimate_new_frame_pose(reconstruction: Reconstruction):
+        """Estimate new frame pose using latest two frames in the map.
+        Frame (R) is the reference frame.
+        frame (C) is the current frame.
+        Frame (G) is the global frame.
+        """
+        frame_R = reconstruction.frames[-2]
+        frame_C = reconstruction.frames[-1]
+        landmarks_G = reconstruction.landmarks_G
+        landmarks_G = VisualOdometry._filter_visible_landmarks_in_frame_R(landmarks_G, frame_R)
+        print(f" - {'Visible landmarks in (R)':35s}: {len(landmarks_G):5d}.")
+        landmarks_G = VisualOdometry._filter_consistent_landmarks_in_frame_R(landmarks_G, frame_R)
+        print(f" - {'Consistent landmarks in (G)':35s}: {len(landmarks_G):5d}.")
+        rel_pose_CR = VisualOdometry._solve_new_pose(landmarks_G, frame_R, frame_C)
+        print(f" - {'Relative translation (R) to (C)':35s}: {rel_pose_CR.t}.")
+        return rel_pose_CR
 
+    @staticmethod
+    def _generate_new_landmarks(
+        rel_pose_CR: SE3,
+        frame_R: Frame,
+        frame_C: Frame,
+        map_points_G: np.ndarray,
+    ):
         # Update new frame pose.
-        rel_pose_LR = rel_pose_RL.inv()
-        cur_frame.pose_G = ref_frame.pose_G @ rel_pose_LR
+        rel_pose_RC = rel_pose_CR.inv()
+        frame_C.pose_G = frame_R.pose_G @ rel_pose_RC
+        P_R = np.hstack([frame_R.camera.K.as_matrix(), np.zeros((3, 1))])
+        P_C = frame_C.camera.K.as_matrix() @ rel_pose_CR.as_augmented_matrix()
+        query_indices, train_indices = Matcher.match(frame_R.descriptors, frame_C.descriptors)
+        keypoints_R = _keypoints_to_ndarray(frame_R.keypoints[query_indices])
+        keypoints_C = _keypoints_to_ndarray(frame_C.keypoints[train_indices])
 
-        # Triangulate new map points.
-        P_L = np.hstack([cur_frame.camera.K.as_matrix(), np.zeros((3, 1))])
-        P_R = ref_frame.camera.K.as_matrix() @ rel_pose_RL.as_augmented_matrix()
-        new_query_indices, train_indices = Matcher.match(
-            ref_frame.descriptors, cur_frame.descriptors
+        # Using optical flow to cross validate matches.
+        predicted_keypoints_C, _ = OpticalFlowLK.track(
+            frame_R.image.data, frame_C.image.data, keypoints_R
         )
-        new_query_keypoints = _keypoints_to_ndarray(ref_frame.keypoints[new_query_indices])
-        new_train_keypoints = _keypoints_to_ndarray(cur_frame.keypoints[train_indices])
-        new_points3d_L = triangulate(P_L, P_R, new_query_keypoints, new_train_keypoints)
+        flow_mask = np.linalg.norm(predicted_keypoints_C - keypoints_C, axis=1) < 1.0
+        keypoints_R = keypoints_R[flow_mask]
+        keypoints_C = keypoints_C[flow_mask]
 
-        # Point cloud simplification.
-        # TODO: Find better way to do this.
-        new_points3d_G = ref_frame.pose_G @ new_points3d_L
-        map_tree = KDTree(filtered_landmark_positions_G)
-        dists = np.asarray([map_tree.query(lm_pose_G)[0] for lm_pose_G in new_points3d_G])
-        min_dist = min(np.percentile(dists, 90) * 0.5, 30.0)
+        new_points3d_R = triangulate(P_R, P_C, keypoints_R, keypoints_C)
+        is_in_range = VisualOdometry._get_points3d_range_mask(new_points3d_R)
+        new_points3d_R = new_points3d_R[is_in_range]
+        frame_R.points3d = new_points3d_R
+        new_points3d_G = frame_R.pose_G @ new_points3d_R
 
-        # Update new 3d points into reconstruction.
-        for i, new_point3d_G in enumerate(new_points3d_G):
-            if new_point3d_G[-1] < 0.1 or np.any(np.abs(new_point3d_G) > 300.0):
+        new_landmarks_G = []
+        new_descriptors = frame_R.descriptors[query_indices][flow_mask][is_in_range]
+
+        tree = KDTree(map_points_G)
+        dists, _ = tree.query(new_points3d_G)
+        for i in range(len(new_points3d_G)):
+            if dists[i] < 0.2:
                 continue
-
-            if dists[i] < min_dist:
-                continue
-
-            lm_pose_G = SE3.from_rotvec_pose(np.r_[0.0, 0.0, 0.0, new_point3d_G])
-
-            reconstruction.add_landmark(
+            new_point3d_G = new_points3d_G[i]
+            new_landmark_pose_G = SE3.from_rotvec_pose(np.r_[np.zeros(3), new_point3d_G])
+            new_landmarks_G.append(
                 Landmark(
                     id=uuid.uuid4(),
-                    pose_G=lm_pose_G,
-                    descriptor=ref_frame.descriptors[new_query_indices][i],
-                    frame_id=ref_frame.id,
+                    pose_G=new_landmark_pose_G,
+                    descriptor=new_descriptors[i],
+                    frame_id=frame_R.id,
                 )
             )
+        return new_landmarks_G
 
-        # Validate new frame pose. TODO: add more validation.
-        translation = np.linalg.norm(rel_pose_LR.t)
-        if translation > 10.0:
-            print(f" - translation is too large: {translation:7.3f}.")
+    def _add_frame(self, reconstruction: Reconstruction, frame: Frame):
+        reconstruction.add_frame(frame)
+
+        # Get the latest two key frames.
+        assert len(reconstruction.frames) >= 2
+        frame_R = reconstruction.frames[-2]
+        frame_C = reconstruction.frames[-1]
+
+        rel_pose_CR = self._estimate_new_frame_pose(reconstruction)
+        translation_mag = np.linalg.norm(rel_pose_CR.t)
+        if translation_mag > 20.0:
+            print(f"Translation too large: {translation_mag:7.3f}!")
             return False
+        new_landmarks_G = self._generate_new_landmarks(
+            rel_pose_CR, frame_R, frame_C, reconstruction.get_landmark_positions_G()
+        )
+        reconstruction.extend_landmarks_G(new_landmarks_G)
         return True
 
     def add_frame(self, reconstruction: Reconstruction, frame: Frame):

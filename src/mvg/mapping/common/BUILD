@@ -23,6 +23,8 @@ py_library(
     name = "visual_odometry",
     srcs = ["visual_odometry.py"],
     deps = [
+        "//mvg/algorithms:optical_flow",
         requirement("ipython"),
+        requirement("matplotlib"),
     ],
 )

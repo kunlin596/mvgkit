@@ -22,11 +22,11 @@ class ImageFileStreamer(StreamerBase):
         self._frame_buffer_lock = threading.Lock()
 
     def _get_frame_reader(self):
-        for filename in os.listdir(self._path):
+        filenames = sorted(os.listdir(self._path))
+        for filename in filenames[::2]:
             # FIXME: only support Kitti images.
             if len(filename) != 14 or not filename.endswith(".png"):
                 continue
-
             filepath = self._path / filename
             print(f" - Reading {filename} ...")
             image = Image(
