@@ -43,7 +43,10 @@ class ImageFileStreamer(StreamerBase):
             return self._frame_buffer
 
     def get(self):
-        return next(self._frame_reader)
+        try:
+            return next(self._frame_reader)
+        except StopIteration:
+            return None
 
 
 class FeatureFileStreamer(StreamerBase):
@@ -52,4 +55,7 @@ class FeatureFileStreamer(StreamerBase):
         self._frame_reader = features.get_feature_iter(self._path)
 
     def get(self):
-        return next(self._frame_reader)
+        try:
+            return next(self._frame_reader)
+        except StopIteration:
+            return None

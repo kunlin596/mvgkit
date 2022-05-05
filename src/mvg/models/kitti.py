@@ -327,6 +327,7 @@ class KittiCameraCalibration:
             k=camera.RadialDistortionModel(dcoeff[0], dcoeff[1], dcoeff[4]),
             p=camera.TangentialDistortionModel(dcoeff[2], dcoeff[3]),
             T=self.T,
+            image_size=tuple(self.image_size),
         )
 
     def get_rectified_camera(self):

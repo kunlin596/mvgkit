@@ -12,10 +12,22 @@ from matplotlib.backends.backend_qt5agg import FigureCanvas
 from matplotlib.backends.backend_qt5agg import NavigationToolbar2QT as NavigationToolbar
 from matplotlib.figure import Figure
 from mvg import streamer
+from mvg.basic import SE3
 from mvg.mapping.mapper.mapper_manager import AvailableMapperType, MapperManager
 from mvg.models import kitti
 from PySide6 import QtCore, QtGui, QtWidgets
 from pyvistaqt import MainWindow, QtInteractor
+
+
+def _plot_pose(plotter, pose: SE3):
+    for i in range(3):
+        plotter.add_arrows(
+            cent=pose.t,
+            direction=pose.R.as_matrix().T[i],
+            mag=1,
+            color=["r", "g", "b"][i],
+            render_lines_as_tubes=True,
+        )
 
 
 class _ExecutionMode(IntEnum):
@@ -134,7 +146,8 @@ class MapCreatorWindow(MainWindow):
     def _run_mapping(self):
         self._state.mode = _ExecutionMode.Consecutive
         while True:
-            self._step_run()
+            if not self._step_run():
+                break
             time.sleep(0.01)
 
     def _update(self):
@@ -172,12 +185,7 @@ class MapCreatorWindow(MainWindow):
                     point_size=5.0,
                 )
 
-                self._plotter.add_points(
-                    np.asarray([pose_G.t]),
-                    render_points_as_spheres=True,
-                    point_size=20.0,
-                    color="g",
-                )
+                _plot_pose(self._plotter, pose_G)
 
             else:
                 points = self._mapper.reconstruction.get_landmark_positions_G()
@@ -188,8 +196,9 @@ class MapCreatorWindow(MainWindow):
 
     def _step_run(self):
         self._state.mode = _ExecutionMode.Step
-        self._mapper.step_run()
+        r = self._mapper.step_run()
         self._image_update_signal.emit()
+        return r
 
     def _show_image(self):
         if self._view_image_dialog is None:
