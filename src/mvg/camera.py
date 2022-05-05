@@ -7,12 +7,12 @@ TODO: Implement image (un)-projection
 
 from dataclasses import dataclass
 from enum import IntEnum
-from mvg import image_processing
-from typing import Optional
+from typing import Optional, Tuple
 
 import cv2
 import numpy as np
 
+from mvg import image_processing
 from mvg.basic import SE3, homogenize
 
 
@@ -127,6 +127,7 @@ class Camera:
     K: Optional[CameraMatrix] = CameraMatrix()
     k: Optional[RadialDistortionModel] = RadialDistortionModel()
     p: Optional[TangentialDistortionModel] = TangentialDistortionModel()
+    image_size: Optional[Tuple[int]] = (0, 0)
 
     # Extrinsics, transforms the points in reference frame to camera frame.
     T: Optional[SE3] = SE3()
