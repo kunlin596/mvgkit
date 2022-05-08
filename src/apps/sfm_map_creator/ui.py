@@ -57,12 +57,16 @@ class MapCreatorWindow(MainWindow):
         interactive: bool = True,
         debug: bool = True,
     ):
+        """TODO: Clean up."""
         QtWidgets.QMainWindow.__init__(self, parent)
         try:
             self._init_ui()
         except AttributeError as e:
             print(f"UI setup failed! e={e}.")
             raise
+
+        self._mapper_thread = None
+        self._ipython_thread = None
 
         self._image_update_signal.connect(self._show_image)
 
@@ -73,10 +77,14 @@ class MapCreatorWindow(MainWindow):
         self._output_path = Path(output_path)
 
         # TODO: remove hardcoded data type.
-        calibration_data = kitti.KittiCalibration(Path(self._calibration_path))
-        camera_calibration0 = calibration_data.stereo_calibration.calibrations[0]
-        self._output_path = self._output_path / str(uuid.uuid4())
-        os.makedirs(self._output_path)
+        try:
+            calibration_data = kitti.KittiCalibration(Path(self._calibration_path))
+            camera_calibration0 = calibration_data.stereo_calibration.calibrations[0]
+            self._output_path = self._output_path / str(uuid.uuid4())
+            os.makedirs(self._output_path)
+        except FileNotFoundError as e:
+            print(e)
+            raise
 
         # Mapper
         self._debug = debug
@@ -91,7 +99,6 @@ class MapCreatorWindow(MainWindow):
                 ),
             ),
         )
-        self._mapper_thread = None
         self._prev_frame_count = 0
 
         # Monitor
@@ -99,7 +106,6 @@ class MapCreatorWindow(MainWindow):
         self._reset_monitor()
 
         # IPython
-        self._ipython_thread = None
         if interactive:
             self._ipython_thread = threading.Thread(target=self._start_ipython)
             self._ipython_thread.start()
@@ -138,7 +144,7 @@ class MapCreatorWindow(MainWindow):
         self._mapper_thread.start()
 
     def __del__(self):
-        if self._mapper_thread.is_alive():
+        if self._mapper_thread is not None and self._mapper_thread.is_alive():
             self._mapper_thread.join()
         if self._ipython_thread is not None and self._ipython_thread.is_alive():
             self._ipython_thread.join()
@@ -148,7 +154,39 @@ class MapCreatorWindow(MainWindow):
         while True:
             if not self._step_run():
                 break
-            time.sleep(0.01)
+            time.sleep(0.001)
+        print("Start map optimization.")
+        self._update_viewer()
+
+    def _update_viewer(self):
+        if self._debug:
+            # NOTE: The points are estimated in reference frame.
+            frames = self._mapper.reconstruction.frames
+            if len(frames) < 2:
+                return
+            ref_frame = frames[-2]
+            points3d = ref_frame.points3d
+            if points3d is None or len(points3d) == 0:
+                return
+
+            pose_G = ref_frame.pose_G
+            image_points = ref_frame.camera.project_points(points3d)
+            image_points = image_points.round().astype(np.int32)
+
+            colors = ref_frame.image.data[image_points[:, 1], image_points[:, 0]]
+            self._plotter.add_points(
+                pose_G @ points3d,
+                scalars=colors,
+                rgb=True,
+                point_size=5.0,
+            )
+            _plot_pose(self._plotter, pose_G)
+        else:
+            points = self._mapper.reconstruction.get_landmark_positions_G()
+            if len(points):
+                self._plotter.add_points(
+                    points, point_size=5.0, color="g", render_points_as_spheres=True
+                )
 
     def _update(self):
         """
@@ -156,47 +194,13 @@ class MapCreatorWindow(MainWindow):
         """
         if self._mapper.state.frame_count != self._prev_frame_count:
             self._prev_frame_count = self._mapper.state.frame_count
-
-            if self._debug:
-                # NOTE: The points are estimated in reference frame.
-                frames = self._mapper.reconstruction.frames
-                if len(frames) < 2:
-                    return
-                ref_frame = frames[-2]
-                points3d = ref_frame.points3d
-                if points3d is None or len(points3d) == 0:
-                    return
-
-                pose_G = ref_frame.pose_G
-                image_points = ref_frame.camera.project_points(points3d)
-                image_points = image_points.round().astype(np.int32)
-
-                colors = (
-                    ref_frame.image.data[image_points[:, 1], image_points[:, 0]]
-                    .reshape(-1, 3)
-                    .astype(np.float)
-                )
-
-                self._plotter.add_points(
-                    pose_G @ points3d,
-                    # render_points_as_spheres=True,
-                    scalars=colors,
-                    rgb=True,
-                    point_size=5.0,
-                )
-
-                _plot_pose(self._plotter, pose_G)
-
-            else:
-                points = self._mapper.reconstruction.get_landmark_positions_G()
-                if len(points):
-                    self._plotter.add_points(
-                        points, point_size=5.0, color="g", render_points_as_spheres=True
-                    )
+            self._update_viewer()
 
     def _step_run(self):
         self._state.mode = _ExecutionMode.Step
         r = self._mapper.step_run()
+        self._mapper.bundle_adjustment()
+        self._update_viewer()
         self._image_update_signal.emit()
         return r
 
