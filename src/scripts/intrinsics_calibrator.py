@@ -5,7 +5,7 @@ import argparse
 import pickle
 from pathlib import Path
 
-from mvg import calibration
+from mvgkit import calibration
 
 
 def read(filename: Path):

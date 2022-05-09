@@ -3,11 +3,11 @@
 """
 import argparse
 import sys
-import numpy as np
 
-from apps.sfm_map_creator.ui import MapCreatorWindow
+import numpy as np
 from PySide6 import QtWidgets
 
+from apps.sfm_map_creator.ui import MapCreatorWindow
 
 if __name__ == "__main__":
 

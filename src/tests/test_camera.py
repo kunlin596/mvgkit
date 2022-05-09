@@ -4,8 +4,10 @@ FIXME: The tests below are incomplete.
 """
 
 import unittest
+
 import numpy as np
-from mvg.camera import CameraMatrix, RadialDistortionModel, TangentialDistortionModel
+
+from mvgkit.camera import CameraMatrix, RadialDistortionModel, TangentialDistortionModel
 
 
 class CameraTest(unittest.TestCase):

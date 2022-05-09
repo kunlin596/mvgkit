@@ -1,6 +1,18 @@
+[build-system]
+requires = [
+    "setuptools>=42",
+    "wheel",
+    "ninja",
+    "cmake>=3.12",
+]
+build-backend = "setuptools.build_meta"
+
+[tool.isort]
+profile = "black"
+
 [tool.black]
 line-length = 100
-target-version = ['py310']
+target-version = ['py39']
 include = '\.pyi?$'
 extend-exclude = '''
 # A regex preceded with ^/ will apply only to files and directories
