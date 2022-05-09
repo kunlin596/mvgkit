@@ -15,21 +15,19 @@ jobs:
           lfs: true
       - name: Checkout LFS objects
         run: git lfs checkout
-      - name: Set up Python 3.10
+      - name: Set up Python 3.9
         uses: actions/setup-python@v2
         with:
-          python-version: "3.10"
+          python-version: "3.9"
       - name: Install dependencies
         run: |
-          python3 -m pip install --upgrade pip
-          pip3 install flake8
-      - name: Setup Bazel
-        run: |
-          sudo apt-get install apt-transport-https curl gnupg
-          curl -fsSL https://bazel.build/bazel-release.pub.gpg | gpg --dearmor >bazel-archive-keyring.gpg
-          sudo mv bazel-archive-keyring.gpg /usr/share/keyrings
-          echo "deb [arch=amd64 signed-by=/usr/share/keyrings/bazel-archive-keyring.gpg] https://storage.googleapis.com/bazel-apt stable jdk1.8" | sudo tee /etc/apt/sources.list.d/bazel.list
-          sudo apt-get update && sudo apt-get install bazel
+          git submodule update --init --recursive
+          python3 -m venv venv
+          pip3 install --upgrade pip setuptools wheel
+          source ./venv/bin/activate
+          pip3 install -r requirements.txt
+          sudo apt-get update
+          sudo apt-get install build-essential cmake make libopencv-dev python3-opencv libeigen3-dev pybind11-dev flake8 libfmt-dev python3-pytest
       - name: Lint
         run: |
           # stop the build if there are Python syntax errors or undefined names
@@ -41,9 +39,11 @@ jobs:
             --max-complexity=10
       - name: Build
         run: |
-          cd src
-          bazel build //...
+          cmake -S third_party/Sophus -B sophus-build -DBUILD_SOPHUS_EXAMPLES=OFF -DBUILD_SOPHUS_TESTS=OFF
+          sudo cmake --build sophus-build --target install -j18
+          cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
+          sudo cmake --build build --target install -j18
+          python3 setup.py install
       - name: Test
         run: |
-          cd src
-          bazel test --test_output=all //...
+          python3 -m pytest src/tests

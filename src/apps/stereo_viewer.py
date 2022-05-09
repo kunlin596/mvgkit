@@ -1,16 +1,16 @@
 #!/usr/bin/env python3
 
-from PySide2 import QtWidgets, QtCore, QtGui
-from PySide2.QtUiTools import QUiLoader
-from PySide2.QtMultimedia import QCamera
-from pathlib import Path
-
 import argparse
-import time
-import sys
-import cv2
 import pickle
+import sys
+import time
+from pathlib import Path
 from typing import List, Optional
+
+import cv2
+from PySide2 import QtCore, QtGui, QtWidgets
+from PySide2.QtMultimedia import QCamera
+from PySide2.QtUiTools import QUiLoader
 
 
 class StereoViewer(QtCore.QObject):

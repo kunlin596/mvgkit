@@ -1,0 +1,3 @@
+[flake8]
+# these error codes interfere with Black
+ignore = E203, E231, E501, W503, B950

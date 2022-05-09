@@ -4,15 +4,15 @@ import unittest
 from pathlib import Path
 
 import numpy as np
-from mvg.calibration import (
+
+from mvgkit.calibration import (
     IntrinsicsCalibration,
     compute_reprejection_error,
     find_corners,
     get_chessboard_object_points,
 )
-from mvg.camera import CameraMatrix
-from mvg.image_processing import Image
-
+from mvgkit.camera import CameraMatrix
+from mvgkit.image_processing import Image
 from tests import data_model
 
 
@@ -55,7 +55,6 @@ class CalibrationTest(unittest.TestCase):
             all_image_points, object_points, debug=True
         )
         print(camera_matrix)
-
         all_extrinsics = debuginfo["all_extrinsics"]
         for i, image_points in enumerate(all_image_points):
             T_CW = all_extrinsics[i]

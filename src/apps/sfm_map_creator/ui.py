@@ -11,12 +11,13 @@ import numpy as np
 from matplotlib.backends.backend_qt5agg import FigureCanvas
 from matplotlib.backends.backend_qt5agg import NavigationToolbar2QT as NavigationToolbar
 from matplotlib.figure import Figure
-from mvg import streamer
-from mvg.basic import SE3
-from mvg.mapping.mapper.mapper_manager import AvailableMapperType, MapperManager
-from mvg.models import kitti
 from PySide6 import QtCore, QtGui, QtWidgets
 from pyvistaqt import MainWindow, QtInteractor
+
+from mvgkit import streamer
+from mvgkit.basic import SE3
+from mvgkit.mapping.mapper.mapper_manager import AvailableMapperType, MapperManager
+from mvgkit.models import kitti
 
 
 def _plot_pose(plotter, pose: SE3):

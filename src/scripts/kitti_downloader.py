@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """ This module downloads and syncs the kitti data set from official s3 buckets.
 """
-import os
 import argparse
+import os
 from pathlib import Path
 
 _S3_URL = "s3://avg-kitti"
