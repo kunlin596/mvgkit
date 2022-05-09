@@ -97,6 +97,7 @@ public:
   EIGEN_MAKE_ALIGNED_OPERATOR_NEW
 
   using Ptr = std::shared_ptr<CameraMatrix>;
+  using ConstPtr = std::shared_ptr<const CameraMatrix>;
 
   CameraMatrix(float fx, float fy, float cx, float cy, float s = 0.0f);
 

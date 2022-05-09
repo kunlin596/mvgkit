@@ -1,4 +1,4 @@
-add_subdirectory(common)
+add_subdirectory(mvgkit)
 
 pybind11_add_module(_mvgkit_cppimpl pythonbindings.cc)
 target_link_libraries(_mvgkit_cppimpl PRIVATE mvgkit_camera)
