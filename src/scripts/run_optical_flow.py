@@ -8,8 +8,9 @@ from pathlib import Path
 import cv2
 import matplotlib.pyplot as plt
 import numpy as np
-from mvg import features
-from mvg.algorithms import optical_flow
+
+from mvgkit import features
+from mvgkit.algorithms import optical_flow
 
 
 def _main(path: Path):

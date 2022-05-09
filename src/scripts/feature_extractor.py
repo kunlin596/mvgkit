@@ -8,7 +8,8 @@ from pathlib import Path
 
 import cv2
 import tqdm
-from mvg import features
+
+from mvgkit import features
 
 
 def _patch_keypoint_pickle():

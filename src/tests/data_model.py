@@ -5,10 +5,11 @@ from pathlib import Path
 from typing import Optional
 
 import numpy as np
-from mvg.camera import CameraMatrix
-from mvg.features import SIFT, Matcher
-from mvg.image_processing import Image
-from mvg.stereo import Fundamental
+
+from mvgkit.camera import CameraMatrix
+from mvgkit.features import SIFT, Matcher
+from mvgkit.image_processing import Image
+from mvgkit.stereo import Fundamental
 
 # FIXME: Put these into conf files.
 WORKSPACE_PATH = Path(os.path.dirname(__file__))
@@ -67,7 +68,7 @@ def get_leuven_stereo_data_pack():
     )
 
     fundamental_root_path = Path(DATA_ROOT_PATH) / "fundamental"
-    with open(fundamental_root_path / "meta.json", "r") as f:
+    with open(fundamental_root_path / "meta.json") as f:
         meta = json.load(f)
     image_L = Image.from_file(str(fundamental_root_path / meta["left"])).data
     image_R = Image.from_file(str(fundamental_root_path / meta["right"])).data
@@ -99,7 +100,7 @@ def get_leuven_stereo_data_pack():
 
 def get_aloe_stereo_data_pack():
     root_path = Path(DATA_ROOT_PATH) / "stereo" / "aloe"
-    with open(root_path / "meta.json", "r") as f:
+    with open(root_path / "meta.json") as f:
         meta = json.load(f)
     image_L = Image.from_file(str(root_path / meta["left"])).resize(0.4).data
     image_R = Image.from_file(str(root_path / meta["right"])).resize(0.4).data
@@ -148,7 +149,7 @@ def get_aloe_stereo_data_pack():
 
 def get_book_stereo_data_pack():
     root_path = Path(DATA_ROOT_PATH) / "stereo" / "book"
-    with open(root_path / "meta.json", "r") as f:
+    with open(root_path / "meta.json") as f:
         meta = json.load(f)
     image_L = Image.from_file(root_path / meta["left"]).data
     image_R = Image.from_file(root_path / meta["right"]).data

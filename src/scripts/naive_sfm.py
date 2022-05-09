@@ -5,9 +5,9 @@ import os
 import uuid
 from pathlib import Path
 
-from mvg.mapping.mapper import sfm
-from mvg.models import kitti
-from mvg.streamer import ImageFileStreamer
+from mvgkit.mapping.mapper import sfm
+from mvgkit.models import kitti
+from mvgkit.streamer import ImageFileStreamer
 
 
 def _main(input_dir, calibration_path, output_dir):

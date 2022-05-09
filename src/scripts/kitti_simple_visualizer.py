@@ -8,9 +8,10 @@ from typing import List
 import matplotlib.pyplot as plt
 import numpy as np
 import pyvista as pv
-from mvg.features import SIFT, Matcher
-from mvg.models import kitti
-from mvg.stereo import Fundamental
+
+from mvgkit.features import SIFT, Matcher
+from mvgkit.models import kitti
+from mvgkit.stereo import Fundamental
 
 np.set_printoptions(suppress=True, precision=7, linewidth=120)
 

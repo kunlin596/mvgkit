@@ -1,12 +1,14 @@
 #!/usr/bin/env python3
+import unittest
 from math import sqrt
 
 import cv2
 import numpy as np
-from mvg.basic import SE3, homogenize
-from mvg.camera import Camera
-from mvg.homography import Homography2d
-from mvg.stereo import (
+
+from mvgkit.basic import SE3, homogenize
+from mvgkit.camera import Camera
+from mvgkit.homography import Homography2d
+from mvgkit.stereo import (
     AffinityRecoverySolver,
     Fundamental,
     StereoMatcher,
@@ -15,8 +17,7 @@ from mvg.stereo import (
     triangulate,
 )
 
-from tests import data_model
-import unittest
+from . import data_model
 
 np.set_printoptions(suppress=True, precision=7, linewidth=120)
 
@@ -132,7 +133,7 @@ class TestStereo(unittest.TestCase):
         camera = Camera(camera_matrix)
         reprojected_L = camera.project_points(points_3d[points_3d_inlier_mask])
 
-        camera = Camera(camera_matrix, T=T_RL)
+        camera = Camera(camera_matrix, quat_CW=T_RL.R.as_quat(), trans_CW=T_RL.t)
         reprojected_R = camera.project_points(points_3d[points_3d_inlier_mask])
 
         reprojected_diff_L = reprojected_L - points_inliers_L[points_3d_inlier_mask]
