@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+#!/usr/bin/env python3 -B
 """This module implement stereo vision related algorithms."""
 
 
@@ -9,6 +9,14 @@ from typing import Optional
 
 import cv2
 import numpy as np
+from _mvgkit_cppimpl.stereo import (
+    EigenAnalysisEightPoint,
+    LinearLeastSquareEightPoint,
+    RansacEigenAnalysisEightPoint,
+    compute_distances_to_epilines,
+    get_epilines_L,
+    get_epilines_R,
+)
 from scipy.optimize import least_squares
 from scipy.spatial.transform import Rotation
 
@@ -33,6 +41,7 @@ class Fundamental:
 
     @dataclass
     class Options:
+        method: str = "eigen"
         num_iters: int = 1000
         atol: float = 0.01
 
@@ -47,6 +56,13 @@ class Fundamental:
         if options is None:
             options = Fundamental.Options()
 
+        if options.method == "lstsq":
+            solve_fn = Fundamental._linear_least_square_eight_point
+        elif options.method == "eigen":
+            solve_fn = Fundamental._eigen_analysis
+        else:
+            raise Exception("Not supported method!")
+
         num_iters = options.num_iters
         atol = options.atol
 
@@ -59,9 +75,14 @@ class Fundamental:
         normalized_x_L = hom_x_L @ N_L.T
         normalized_x_R = hom_x_R @ N_R.T
 
-        F_RL, inlier_mask = Fundamental._initialze(
-            x_L=normalized_x_L, x_R=normalized_x_R, num_iters=num_iters, atol=atol
+        F_RL, inlier_mask = Fundamental._initialize(
+            x_L=normalized_x_L,
+            x_R=normalized_x_R,
+            num_iters=num_iters,
+            atol=atol,
+            solve_fn=solve_fn,
         )
+
         F_RL = Fundamental._optimize(
             x_L=normalized_x_L[inlier_mask], x_R=normalized_x_R[inlier_mask], initial_F_RL=F_RL
         )
@@ -74,84 +95,11 @@ class Fundamental:
 
     @staticmethod
     def _linear_least_square_eight_point(*, x_L: np.ndarray, x_R: np.ndarray):
-        """Solve homogeneous linear equations
-
-        Since the objective function is A @ f = 0, w/o loss of generality,
-        we can choose to set one of f to be 0, and solve the linear system.
-
-        However, since we don't know which entry of f is non-zero,
-        we need to test it 9 times.
-
-        See 3.2.1 of the paper below.
-        Z. Zhang, “Determining the Epipolar Geometry and Its Uncertainty: A Review,”
-        Technical Report RR-2927, INRIA, 1996.
-        """
-
-        # Re-write x_L.T @ F @ x_R = 0 to A @ f = 0
-        A = np.asarray([np.kron(p_R, p_L) for (p_L, p_R) in zip(x_L, x_R)])
-
-        best_F = None
-        min_error = np.Inf
-        n_cols = len(A[-1])
-
-        for i in range(n_cols):
-            indices = list(range(n_cols))
-            selected_column_index = indices.pop(i)
-            U = A[:, indices]
-            u = A[:, selected_column_index]
-
-            f_prime = np.linalg.inv(U.T @ U) @ U.T @ u
-            F = -np.r_[f_prime, -1.0].reshape(3, 3)
-
-            residual = Fundamental._compute_algebraic_residual(F, x_L, x_R)
-            error = np.linalg.norm(residual)
-
-            if error < min_error:
-                min_error = error
-                best_F = F
-
-        return best_F
+        return LinearLeastSquareEightPoint.compute(x_L[:, :2], x_R[:, :2])
 
     @staticmethod
     def _eigen_analysis(*, x_L: np.ndarray, x_R: np.ndarray):
-        """
-        See 3.2.2 of the paper below.
-        Z. Zhang, “Determining the Epipolar Geometry and Its Uncertainty: A Review,”
-        Technical Report RR-2927, INRIA, 1996.
-        """
-        # Re-write x_L.T @ F @ x_R = 0 to A @ f = 0
-        A = np.asarray([np.kron(p_R, p_L) for (p_L, p_R) in zip(x_L, x_R)])
-        _, _, vt = np.linalg.svd(A)
-        F_RL = vt[-1].reshape(3, 3)
-        return F_RL
-
-    @staticmethod
-    def _ransac_point_registrator(*, x_L: np.ndarray, x_R: np.ndarray, num_iters=1000, atol=0.01):
-        i = 0
-        max_num_inliers = -1
-        best_F_RL = None
-        best_inlier_mask = None
-        num_points = len(x_L)
-        while i < num_iters:
-            samples = np.random.randint(0, num_points, 8)
-            while len(set(samples)) != len(samples):
-                samples = np.random.randint(0, num_points, 8)
-
-            F_RL = Fundamental._eigen_analysis(x_L=x_L[samples], x_R=x_R[samples])
-            distances = np.abs(Fundamental._residual(F_RL.reshape(-1), x_L, x_R))
-            distances_L = distances[: len(distances) // 2]
-            distances_R = distances[len(distances) // 2 :]
-
-            inlier_mask = (distances_L < atol) & (distances_R < atol)
-            num_inliers = np.count_nonzero(inlier_mask)
-
-            if num_inliers > max_num_inliers:
-                max_num_inliers = num_inliers
-                best_F_RL = F_RL
-                best_inlier_mask = inlier_mask
-            i += 1
-
-        return best_F_RL, best_inlier_mask
+        return EigenAnalysisEightPoint.compute(x_L[:, :2], x_R[:, :2])
 
     @staticmethod
     def _impose_F_rank(F_RL: np.ndarray):
@@ -168,15 +116,17 @@ class Fundamental:
         return F_RL
 
     @staticmethod
-    def _initialze(*, x_L: np.ndarray, x_R: np.ndarray, num_iters: int, atol: float) -> np.ndarray:
+    def _initialize(
+        *, x_L: np.ndarray, x_R: np.ndarray, num_iters: int, atol: float, solve_fn
+    ) -> np.ndarray:
         """Initialize a initial F estimation for later optimization."""
         assert len(x_L) >= 8, f"Number of points are is {len(x_L)} less than 8!"
-        F_RL, inlier_mask = Fundamental._ransac_point_registrator(
-            x_L=x_L, x_R=x_R, num_iters=num_iters, atol=atol
+        F_RL, inlier_mask = RansacEigenAnalysisEightPoint.compute(
+            x_L=x_L[:, :2], x_R=x_R[:, :2], max_iterations=num_iters * 2, atol=atol
         )
         if F_RL is None:
             print("RANSAC failed! Use all points")
-            F_RL = Fundamental._eigen_analysis(x_L=x_L, x_R=x_R)
+            F_RL = solve_fn(x_L=x_L, x_R=x_R)
             return F_RL, np.ones(len(x_L), dtype=np.uint8).view(bool)
         return F_RL, inlier_mask
 
@@ -229,39 +179,15 @@ class Fundamental:
         return np.real(epipole_R)
 
     @staticmethod
-    def get_epilines_L(*, x_R, F_RL):
-        """Get epipolar lines on the left image from the right points."""
-        return x_R @ F_RL
-
-    @staticmethod
-    def get_epilines_R(*, x_L, F_RL):
-        """Get epipolar lines on the right image from the left points."""
-        return x_L @ F_RL.T
-
-    @staticmethod
-    def _compute_distances_to_epilines(*, x, epilines):
-        """Compute the distances of the points to their conjugate epipolar lines."""
-        return np.sum(epilines * x, axis=1) / np.linalg.norm(epilines[:, :2], axis=1)
-
-    @staticmethod
     def _residual(f: np.ndarray, x_L: np.ndarray, x_R: np.ndarray):
         """Computes the distances from points to their conjugate epipolar lines."""
         F_RL = f.reshape(3, 3)
 
-        epilines_L = Fundamental.get_epilines_L(x_R=x_R, F_RL=F_RL)
-        distances_L = Fundamental._compute_distances_to_epilines(x=x_L, epilines=epilines_L)
-
-        epilines_R = Fundamental.get_epilines_R(x_L=x_L, F_RL=F_RL)
-        distances_R = Fundamental._compute_distances_to_epilines(x=x_R, epilines=epilines_R)
-
+        epilines_L = get_epilines_L(x_R[:, :2].T, F_RL).T
+        distances_L = compute_distances_to_epilines(x_L[:, :2].T, epilines_L.T)
+        epilines_R = get_epilines_R(x_L[:, :2].T, F_RL).T
+        distances_R = compute_distances_to_epilines(x_R[:, :2].T, epilines_R.T)
         return np.r_[distances_L, distances_R]
-
-    @staticmethod
-    def _compute_algebraic_residual(F_RL, x_L, x_R):
-        """Compute the algebraic residual."""
-        # NOTE: Diagonal means to remove the cross terms.
-        # NOTE: Copy is necessary because somehow the output array from np.diagonal is readonly.
-        return np.diagonal(homogenize(x_R) @ F_RL @ homogenize(x_L).T).copy()
 
     @staticmethod
     def compute_geometric_rms(*, F_RL: np.ndarray, x_L: np.ndarray, x_R: np.ndarray):
@@ -312,47 +238,6 @@ class Fundamental:
 
         plt.tight_layout()
         plt.show()
-
-    # @staticmethod
-    # def _assert_symbolic_A():
-    #     """This function is used for manual validation."""
-    #     import sympy as sym
-
-    #     x_L = np.array(np.r_[sym.symbols("x1 y1"), 1.0]).reshape(-1, 1)
-    #     x_R = np.array(np.r_[sym.symbols("x2 y2"), 1.0]).reshape(-1, 1)
-
-    #     F_RL = []
-    #     for row in range(1, 4):
-    #         for col in range(1, 4):
-    #             F_RL.append(sym.Symbol(f"f{row}{col}"))
-    #     F_RL = np.asarray(F_RL).reshape(3, 3)
-
-    #     eqn1 = sym.Matrix(x_R.T @ F_RL @ x_L)
-    #     eqn2 = sym.Matrix(x_L.T @ F_RL.T @ x_R)
-
-    #     A = np.kron(x_R, x_L)
-    #     f = F_RL.reshape(-1)
-    #     Af = A.T @ f
-    #     eqn3 = sym.Matrix(Af)
-
-    #     subs = dict(
-    #         x1=1,
-    #         x2=2,
-    #         y1=3,
-    #         y2=4,
-    #         f11=1,
-    #         f12=2,
-    #         f13=3,
-    #         f21=4,
-    #         f22=5,
-    #         f23=6,
-    #         f31=7,
-    #         f32=8,
-    #         f33=9,
-    #     )
-
-    #     assert eqn1.subs(subs) == eqn2.subs(subs)
-    #     assert eqn3.subs(subs) == eqn1.subs(subs)
 
 
 def decompose_essential_matrix(*, E_RL: np.ndarray):
