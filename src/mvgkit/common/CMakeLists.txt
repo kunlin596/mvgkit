@@ -10,4 +10,4 @@ endif()
 set_target_properties(mvgkit_camera PROPERTIES OUTPUT_NAME ${LIB_NAME})
 
 install(TARGETS mvgkit_camera LIBRARY DESTINATION lib)
-install(FILES camera.h DESTINATION include/mvgkit)
+install(FILES camera.h random.h DESTINATION include/mvgkit/common)

@@ -112,7 +112,9 @@ class CMakeBuild(build_ext):
             os.makedirs(build_temp)
 
         subprocess.check_call(["cmake", ext.sourcedir] + cmake_args, cwd=build_temp)
-        subprocess.check_call(["cmake", "--build", "."] + build_args, cwd=build_temp)
+        subprocess.check_call(
+            ["cmake", "--build", ".", f"-j{os.cpu_count()}"] + build_args, cwd=build_temp
+        )
 
 
 # The information here can also be placed in setup.cfg - better separation of
