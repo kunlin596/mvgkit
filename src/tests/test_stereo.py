@@ -22,6 +22,21 @@ from . import data_model
 np.set_printoptions(suppress=True, precision=7, linewidth=120)
 
 
+def _get_epilines_L(*, x_R, F_RL):
+    """Get epipolar lines on the left image from the right points."""
+    return x_R @ F_RL
+
+
+def _get_epilines_R(*, x_L, F_RL):
+    """Get epipolar lines on the right image from the left points."""
+    return x_L @ F_RL.T
+
+
+def _compute_distances_to_epilines(*, x, epilines):
+    """Compute the distances of the points to their conjugate epipolar lines."""
+    return np.sum(epilines * x, axis=1) / np.linalg.norm(epilines[:, :2], axis=1)
+
+
 def _solve_line_intersections(lines):
     A = lines[:, :2]
     b = -lines[:, 2]
@@ -87,12 +102,12 @@ class TestStereo(unittest.TestCase):
 
         rms_cv = Fundamental.compute_geometric_rms(F_RL=Fcv_LR, x_L=points_L, x_R=points_R)
 
-        lines_L = Fundamental.get_epilines_L(x_R=homogenize(points_R), F_RL=F_RL)
+        lines_L = _get_epilines_L(x_R=homogenize(points_R), F_RL=F_RL)
         assert np.allclose(
             Fundamental.get_epipole_L(F_RL=F_RL)[:2], _solve_line_intersections(lines_L)
         ), "Left epipoles from F is not the same as the intersection of all left epilines!"
 
-        lines_R = Fundamental.get_epilines_R(x_L=homogenize(points_L), F_RL=F_RL)
+        lines_R = _get_epilines_R(x_L=homogenize(points_L), F_RL=F_RL)
         assert np.allclose(
             Fundamental.get_epipole_R(F_RL=F_RL)[:2], _solve_line_intersections(lines_R)
         ), "Right epipoles from F is not the same as the intersection of all right epilines!"
@@ -212,13 +227,13 @@ class TestStereo(unittest.TestCase):
             F_RL=F_RL, image_shape_L=image_L.shape, image_shape_R=image_R.shape
         )
 
-        lines_L = Fundamental.get_epilines_L(x_R=homogenize(points_inliers_R), F_RL=F_RL)
+        lines_L = _get_epilines_L(x_R=homogenize(points_inliers_R), F_RL=F_RL)
         warped_lines_L = lines_L @ np.linalg.inv(H_L)
         assert np.allclose(
             (warped_lines_L[:, 1] / warped_lines_L[:, 0]).ptp(), 0.0
         ), "Warped lines in left image are not parallel to each other!"
 
-        lines_R = Fundamental.get_epilines_R(x_L=homogenize(points_inliers_L), F_RL=F_RL)
+        lines_R = _get_epilines_R(x_L=homogenize(points_inliers_L), F_RL=F_RL)
         warped_lines_R = lines_R @ np.linalg.inv(H_R)
         assert np.allclose(
             (warped_lines_R[:, 1] / warped_lines_R[:, 0]).ptp(), 0.0
