@@ -17,8 +17,10 @@ The current implementations are all done in Python 3, but in the future, the tim
 
 ### Dependencies
 
+#### Ubuntu 20.04
+
 ```shell
-apt-get install build-essential cmake make libopencv-dev python3-opencv libeigen3-dev pybind11-dev flake8 libfmt-dev libceres-dev
+apt-get install build-essential cmake make libopencv-dev python3-opencv libeigen3-dev pybind11-dev flake8 libfmt-dev libceres-dev libgtest-dev
 ```
 
 Using a Python virtual environment is recommended here, simply create a standard virtual environment and install the dependencies.

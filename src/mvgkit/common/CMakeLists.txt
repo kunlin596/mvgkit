@@ -9,5 +9,14 @@ else()
 endif()
 set_target_properties(mvgkit_camera PROPERTIES OUTPUT_NAME ${LIB_NAME})
 
+set(COMMON_HEADERS camera.h random.h transformation.h math.h)
+
 install(TARGETS mvgkit_camera LIBRARY DESTINATION lib)
-install(FILES camera.h random.h DESTINATION include/mvgkit/common)
+install(FILES ${COMMON_HEADERS} DESTINATION include/mvgkit/common)
+
+if(ENABLE_MVGKIT_TESTS)
+  add_executable(mvgkit_testMath tests/testMath.cc)
+  target_link_libraries(mvgkit_testMath Eigen3::Eigen GTest::gtest
+                        GTest::gtest_main)
+  add_test(mvgkit_testMath mvgkit_testMath)
+endif()
