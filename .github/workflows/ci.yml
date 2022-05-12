@@ -33,7 +33,8 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y -qq \
             build-essential cmake make libopencv-dev python3-opencv \
-            libeigen3-dev pybind11-dev flake8 libfmt-dev libceres-dev valgrind
+            libeigen3-dev pybind11-dev flake8 libfmt-dev libceres-dev libgtest-dev \
+            valgrind
       - name: Lint
         run: |
           flake8 src \
@@ -45,10 +46,14 @@ jobs:
         run: |
           cmake -S third_party/Sophus -B /tmp/sophus-build -DBUILD_SOPHUS_EXAMPLES=OFF -DBUILD_SOPHUS_TESTS=OFF
           sudo cmake --build /tmp/sophus-build --target install -j8
-      - name: Build C++ code
+      - name: Build C++ libraries
         run: |
-          cmake -S . -B /tmp/mvgkit_build -DCMAKE_BUILD_TYPE=ASAN
+          cmake -S . -B /tmp/mvgkit_build -DCMAKE_BUILD_TYPE=ASAN -DENABLE_MVGKIT_TESTS=ON
           sudo cmake --build /tmp/mvgkit_build --target install -j8
+      - name: Test C++ libraries
+        run: |
+          cmake --build /tmp/mvgkit_build --target test -j8
+
       # NOTE: Disable for now since it's super slow.
       # - name: Valgrind checking
       #   run: |
