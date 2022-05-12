@@ -7,47 +7,55 @@ on:
     branches: [master]
 
 jobs:
-  build-and-test:
+  Build:
     runs-on: ubuntu-20.04
     steps:
-      - uses: actions/checkout@v2
+      - name: Checkout
+        uses: actions/checkout@v2
         with:
+          submodules: "true"
           lfs: true
       - name: Checkout LFS objects
         run: git lfs checkout
-      - name: Set up Python 3.9
+      - name: Set up Python 3.8
         uses: actions/setup-python@v2
         with:
-          python-version: "3.9"
-      - name: Setup venv
+          python-version: "3.8"
+      - name: Setup Python virtual environment
         run: |
           python3 -m venv venv
           pip3 install --upgrade pip setuptools wheel
           source ./venv/bin/activate
       - name: Install dependencies
         run: |
-          git submodule update --init --recursive
-          python -m pip install --upgrade pip
-          if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
+          python3 -m pip install --upgrade pip
+          python3 -m pip install -r requirements.txt
           sudo apt-get update
-          sudo apt-get install \
+          sudo apt-get install -y -qq \
             build-essential cmake make libopencv-dev python3-opencv \
-            libeigen3-dev pybind11-dev flake8 libfmt-dev libceres-dev
+            libeigen3-dev pybind11-dev flake8 libfmt-dev libceres-dev valgrind
       - name: Lint
         run: |
           flake8 src \
             --show-source \
             --statistics \
-            --ignore=E203,E501 \
             --max-line-length=127 \
             --max-complexity=10
-      - name: Build
+      - name: Build third-party libraries
         run: |
-          cmake -S third_party/Sophus -B sophus-build -DBUILD_SOPHUS_EXAMPLES=OFF -DBUILD_SOPHUS_TESTS=OFF
-          sudo cmake --build sophus-build --target install -j18
-          cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
-          sudo cmake --build build --target install -j18
+          cmake -S third_party/Sophus -B /tmp/sophus-build -DBUILD_SOPHUS_EXAMPLES=OFF -DBUILD_SOPHUS_TESTS=OFF
+          sudo cmake --build /tmp/sophus-build --target install -j8
+      - name: Build C++ code
+        run: |
+          cmake -S . -B /tmp/mvgkit_build -DCMAKE_BUILD_TYPE=ASAN
+          sudo cmake --build /tmp/mvgkit_build --target install -j8
+      # NOTE: Disable for now since it's super slow.
+      # - name: Valgrind checking
+      #   run: |
+      #     PYTHONMALLOC=malloc python3 -B tools/valgrind_check_pytest.py -i src/tests
+      - name: Build and install Python packages
+        run: |
           pip3 install -e .
-      - name: Test
+      - name: Test Python packages
         run: |
-          python3 -m pytest -q -s src/tests
+          python3 -B -m pytest -q -s src/tests

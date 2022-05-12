@@ -16,8 +16,7 @@ from mvgkit.stereo import (
     decompose_essential_matrix,
     triangulate,
 )
-
-from . import data_model
+from tests import data_model
 
 np.set_printoptions(suppress=True, precision=7, linewidth=120)
 
