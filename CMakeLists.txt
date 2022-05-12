@@ -8,5 +8,6 @@ find_package(pybind11 CONFIG)
 find_package(Eigen3 3.3 REQUIRED)
 find_package(Sophus REQUIRED)
 find_package(fmt REQUIRED)
+find_package(Ceres REQUIRED)
 
 add_subdirectory(src)

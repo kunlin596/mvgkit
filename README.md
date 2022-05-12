@@ -18,7 +18,7 @@ The current implementations are all done in Python 3, but in the future, the tim
 ### Dependencies
 
 ```shell
-apt-get install build-essential cmake make libopencv-dev python3-opencv libeigen3-dev pybind11-dev flake8 libfmt-dev
+apt-get install build-essential cmake make libopencv-dev python3-opencv libeigen3-dev pybind11-dev flake8 libfmt-dev libceres-dev
 ```
 
 Using a Python virtual environment is recommended here, simply create a standard virtual environment and install the dependencies.
@@ -27,12 +27,14 @@ Using a Python virtual environment is recommended here, simply create a standard
 
 ```shell
 cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
-cmake --build build --target install -j18
+cmake --build build --target install -j8
 ```
 
 ### Python Bindings
 
 ```shell
+python3 -m virtualenv venv
+source venv/bin/activate
 python3 -m pip install -r requirements.txt
 python3 -m pip install -e .
 ```

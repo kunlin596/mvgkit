@@ -32,7 +32,7 @@ jobs:
           sudo apt-get update
           sudo apt-get install \
             build-essential cmake make libopencv-dev python3-opencv \
-            libeigen3-dev pybind11-dev flake8 libfmt-dev
+            libeigen3-dev pybind11-dev flake8 libfmt-dev libceres-dev
       - name: Lint
         run: |
           flake8 src \
