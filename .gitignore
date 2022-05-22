@@ -133,3 +133,6 @@ dmypy.json
 
 # editor
 .vscode
+
+# CMake
+CMakeFiles

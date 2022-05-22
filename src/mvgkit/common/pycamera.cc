@@ -1,5 +1,3 @@
-#pragma once
-
 #include "camera.h"
 #include <Eigen/Geometry>
 #include <iostream>
@@ -107,3 +105,8 @@ add_camera_module(py::module& m)
 
 } // python
 } // mvgkit
+
+PYBIND11_MODULE(_mvgkit_camera_cppimpl, m)
+{
+  mvgkit::python::add_camera_module(m);
+}

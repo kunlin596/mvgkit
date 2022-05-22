@@ -9,220 +9,67 @@ from typing import Optional
 
 import cv2
 import numpy as np
-from _mvgkit_cppimpl.stereo import (
-    EigenAnalysisEightPoint,
-    LinearLeastSquareEightPoint,
-    RansacEigenAnalysisEightPoint,
-    compute_distances_to_epilines,
-    get_epilines_L,
-    get_epilines_R,
-)
 from scipy.optimize import least_squares
 from scipy.spatial.transform import Rotation
 
-from mvgkit.basic import (
-    SkewSymmetricMatrix3d,
-    get_isotropic_scaling_matrix_2d,
-    get_line_points_in_image,
-    homogenize,
+from _mvgkit_stereo_cppimpl import (  # noqa: F401
+    EightPoint,
+    Fundamental,
+    FundamentalOptions,
+    compute_reprojection_residuals,
+    get_epilines,
+    get_epipole,
 )
+from mvgkit.basic import SkewSymmetricMatrix3d, get_line_points_in_image
 from mvgkit.homography import Homography2d
 
 
-class Fundamental:
-    """This class implements methods for computing fundamental (as well as essential) matrix.
+def plot_epipolar_lines(
+    image_L: np.ndarray,
+    image_R: np.ndarray,
+    points_L: np.ndarray,
+    points_R: np.ndarray,
+    F_RL: np.ndarray,
+):
+    import matplotlib.pyplot as plt
 
-    The epipolar co-planarity constraint can be expressed as the equations below as
+    colors = np.random.random((len(points_L), 3)) * 0.7 + 0.1
 
-    Here, x_L and x_R are the corresponding pixel coordinates in the frame (L) and (R) respectively,
-    K_L and L_R is the camera matrices. R_LR is the relative orientation of frame (R) expressed in frame (L),
-    t_LR is the skew symmetric matrix of the translation vector t from frame (L) to (R).
-    """
+    def _plot_line(ax, lines, width, height):
+        for i, l in enumerate(lines):
+            points = get_line_points_in_image(l, width, height)
+            ax.plot(points[:, 0], points[:, 1], alpha=0.8, color=colors[i])
 
-    @dataclass
-    class Options:
-        num_iters: int = 1000
-        atol: float = 0.01
+    _, (ax1, ax2) = plt.subplots(1, 2, sharey=True, sharex=True)
 
-    @staticmethod
-    def compute(
-        *, x_L: np.ndarray, x_R: np.ndarray, options: Optional[Options] = None
-    ) -> np.ndarray:
-        assert (len(x_L) >= 8) and (
-            len(x_R) >= 8
-        ), f"Not enough points! len(x_L): {len(x_L)}, len(x_R): {len(x_R)}."
+    width = image_L.shape[1]
+    height = image_L.shape[0]
 
-        if options is None:
-            options = Fundamental.Options()
+    ax1.set_title("Corresponding epilines of (R) in (L)")
+    ax1.imshow(image_L)
+    ax1.set_xlim([0, width])
+    ax1.set_ylim([height, 0])
+    left_lines = get_epilines(x_R=points_R, F_RL=F_RL)
+    left_epipole = get_epipole(F_RL)
+    _plot_line(ax1, left_lines, width, height)
+    ax1.scatter(points_L[:, 0], points_L[:, 1], color=colors)
+    ax1.scatter([left_epipole[0]], [left_epipole[1]], color="r", s=30.0, alpha=1.0)
 
-        num_iters = options.num_iters
-        atol = options.atol
+    width = image_R.shape[1]
+    height = image_R.shape[0]
 
-        N_L = get_isotropic_scaling_matrix_2d(x_L)
-        N_R = get_isotropic_scaling_matrix_2d(x_R)
+    ax2.set_title("Corresponding epilines of (L) in (R)")
+    ax2.imshow(image_R)
+    ax2.set_xlim([0, width])
+    ax2.set_ylim([height, 0])
+    right_lines = get_epilines(x_R=points_L, F_RL=F_RL.T)
+    right_epipole = get_epipole(F_RL.T)
+    _plot_line(ax2, right_lines, width, height)
+    ax2.scatter(points_R[:, 0], points_R[:, 1], color=colors)
+    ax2.scatter([right_epipole[0]], [right_epipole[1]], color="r", s=30.0, alpha=1.0)
 
-        hom_x_L = homogenize(x_L)
-        hom_x_R = homogenize(x_R)
-
-        normalized_x_L = hom_x_L @ N_L.T
-        normalized_x_R = hom_x_R @ N_R.T
-
-        F_RL, inlier_mask = Fundamental._initialize(
-            x_L=normalized_x_L,
-            x_R=normalized_x_R,
-            num_iters=num_iters,
-            atol=atol,
-        )
-
-        F_RL = Fundamental._optimize(
-            x_L=normalized_x_L[inlier_mask], x_R=normalized_x_R[inlier_mask], initial_F_RL=F_RL
-        )
-
-        F_RL = N_R.T @ F_RL @ N_L
-        F_RL = Fundamental._impose_F_rank(F_RL)
-        F_RL /= F_RL[-1, -1]
-
-        return F_RL, inlier_mask
-
-    @staticmethod
-    def _linear_least_square_eight_point(*, x_L: np.ndarray, x_R: np.ndarray):
-        return LinearLeastSquareEightPoint.compute(x_L[:, :2], x_R[:, :2])
-
-    @staticmethod
-    def _eigen_analysis(*, x_L: np.ndarray, x_R: np.ndarray):
-        return EigenAnalysisEightPoint.compute(x_L[:, :2], x_R[:, :2])
-
-    @staticmethod
-    def _impose_F_rank(F_RL: np.ndarray):
-        """
-        Because of the existence of skewed symmetric matrix related to translation vector in F,
-        the rank is at most 2, we need to impose it.
-
-        See 3.2.3 of the paper below.
-        Z. Zhang, “Determining the Epipolar Geometry and Its Uncertainty: A Review,”
-        Technical Report RR-2927, INRIA, 1996.
-        """
-        U, singular_values, Vt = np.linalg.svd(F_RL)
-        F_RL = U @ np.diag([singular_values[0], singular_values[1], 0.0]) @ Vt
-        return F_RL
-
-    @staticmethod
-    def _initialize(*, x_L: np.ndarray, x_R: np.ndarray, num_iters: int, atol: float) -> np.ndarray:
-        """Initialize a initial F estimation for later optimization."""
-        assert len(x_L) >= 8, f"Number of points are is {len(x_L)} less than 8!"
-        F_RL, inlier_mask = RansacEigenAnalysisEightPoint.compute(
-            x_L=x_L[:, :2], x_R=x_R[:, :2], max_iterations=num_iters * 2, atol=atol
-        )
-        return F_RL, inlier_mask
-
-    @staticmethod
-    def _optimize(*, x_L: np.ndarray, x_R: np.ndarray, initial_F_RL: np.ndarray) -> np.ndarray:
-        """Optimization the fundamental matrix.
-
-        Optimization by exploiting the epipolar constraints and
-        minimizing the distances from points to their conjugate epipolar lines.
-
-        See 3.4 of the paper below.
-        Z. Zhang, “Determining the Epipolar Geometry and Its Uncertainty: A Review,”
-        Technical Report RR-2927, INRIA, 1996.
-        """
-        try:
-            # print("Optimizing F...")
-            result = least_squares(
-                fun=Fundamental._residual,
-                x0=initial_F_RL.reshape(-1),
-                args=(x_L, x_R),
-                loss="huber",
-            )
-
-            if not result["success"]:
-                print("Optimization failed! Use initial F.")
-                return initial_F_RL
-
-            F_RL = result["x"].reshape(3, 3)
-            F_RL = Fundamental._impose_F_rank(F_RL)
-            return F_RL
-
-        except Exception as e:
-            print(f"Optimization failed, use initial F. Error: {e}")
-            return initial_F_RL
-
-    @staticmethod
-    def get_epipole_L(*, F_RL):
-        assert np.allclose(np.linalg.det(F_RL), 0.0)
-        eigenvalues, eigenvectors = np.linalg.eig(F_RL)
-        epipole_L = eigenvectors[:, eigenvalues.argmin()]
-        epipole_L /= epipole_L[-1]
-        return np.real(epipole_L)
-
-    @staticmethod
-    def get_epipole_R(*, F_RL):
-        assert np.allclose(np.linalg.det(F_RL), 0.0)
-        eigenvalues, eigenvectors = np.linalg.eig(F_RL.T)
-        epipole_R = eigenvectors[:, eigenvalues.argmin()]
-        epipole_R /= epipole_R[-1]
-        return np.real(epipole_R)
-
-    @staticmethod
-    def _residual(f: np.ndarray, x_L: np.ndarray, x_R: np.ndarray):
-        """Computes the distances from points to their conjugate epipolar lines."""
-        F_RL = f.reshape(3, 3)
-
-        epilines_L = get_epilines_L(x_R[:, :2].T, F_RL).T
-        distances_L = compute_distances_to_epilines(x_L[:, :2].T, epilines_L.T)
-        epilines_R = get_epilines_R(x_L[:, :2].T, F_RL).T
-        distances_R = compute_distances_to_epilines(x_R[:, :2].T, epilines_R.T)
-        return np.r_[distances_L, distances_R]
-
-    @staticmethod
-    def compute_geometric_rms(*, F_RL: np.ndarray, x_L: np.ndarray, x_R: np.ndarray):
-        """Computes the directional distances from points to their conjugate epilines."""
-        distances = Fundamental._residual(F_RL.reshape(-1), homogenize(x_L), homogenize(x_R))
-        return sqrt((distances**2).mean())
-
-    @staticmethod
-    def plot_epipolar_lines(
-        image_L: np.ndarray,
-        image_R: np.ndarray,
-        points_L: np.ndarray,
-        points_R: np.ndarray,
-        F_RL: np.ndarray,
-    ):
-        import matplotlib.pyplot as plt
-
-        colors = np.random.random((len(points_L), 3)) * 0.7 + 0.1
-
-        def _plot_line(ax, lines, width, height):
-            for i, l in enumerate(lines):
-                points = get_line_points_in_image(l, width, height)
-                ax.plot(points[:, 0], points[:, 1], alpha=0.8, color=colors[i])
-
-        _, (ax1, ax2) = plt.subplots(1, 2, sharey=True, sharex=True)
-
-        width = image_L.shape[1]
-        height = image_L.shape[0]
-
-        ax1.set_title("Corresponding epilines of (R) in (L)")
-        ax1.imshow(image_L)
-        ax1.set_xlim([0, width])
-        ax1.set_ylim([height, 0])
-        left_lines = Fundamental.get_epilines_L(x_R=homogenize(points_R), F_RL=F_RL)
-        _plot_line(ax1, left_lines, width, height)
-        ax1.scatter(points_L[:, 0], points_L[:, 1], color=colors)
-
-        width = image_R.shape[1]
-        height = image_R.shape[0]
-
-        ax2.set_title("Corresponding epilines of (L) in (R)")
-        ax2.imshow(image_R)
-        ax2.set_xlim([0, width])
-        ax2.set_ylim([height, 0])
-        right_lines = Fundamental.get_epilines_R(x_L=homogenize(points_L), F_RL=F_RL)
-        _plot_line(ax2, right_lines, width, height)
-        ax2.scatter(points_R[:, 0], points_R[:, 1], color=colors)
-
-        plt.tight_layout()
-        plt.show()
+    plt.tight_layout()
+    plt.show()
 
 
 def decompose_essential_matrix(*, E_RL: np.ndarray):
@@ -354,8 +201,8 @@ class AffinityRecoverySolver:
     @staticmethod
     def _solve(F_RL, image_shape_L, image_shape_R):
         """Solve the undistortion homography for left image."""
-        epipole_L = Fundamental.get_epipole_L(F_RL=F_RL)
-        e_x = SkewSymmetricMatrix3d.from_vec(epipole_L).as_matrix()
+        epipole_L = get_epipole(F_RL=F_RL)
+        e_x = SkewSymmetricMatrix3d.from_vec(np.r_[epipole_L, 1.0]).as_matrix()
 
         A_L, B_L = AffinityRecoverySolver._get_AB(e_x, image_shape_L)
         A_R, B_R = AffinityRecoverySolver._get_AB(F_RL, image_shape_R)

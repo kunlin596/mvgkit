@@ -40,19 +40,11 @@ jobs:
             --max-complexity=10
       - name: Build C++ libraries
         run: |
-          cmake -S . -B /tmp/mvgkit_build -DCMAKE_BUILD_TYPE=ASAN -DENABLE_MVGKIT_TESTS=ON
+          cmake -S . -B /tmp/mvgkit_build -DCMAKE_BUILD_TYPE=ASAN -DBUILD_MVGKIT_TESTS=ON
           sudo cmake --build /tmp/mvgkit_build --target install -j8
-      - name: Test C++ libraries
+      - name: Install Python packages
         run: |
-          cmake --build /tmp/mvgkit_build --target test -j8
-
-      # NOTE: Disable for now since it's super slow.
-      # - name: Valgrind checking
-      #   run: |
-      #     PYTHONMALLOC=malloc python3 -B tools/valgrind_check_pytest.py -i src/tests
-      - name: Build and install Python packages
-        run: |
-          pip3 install -e .
+          python setup.py build -j 16 install
       - name: Test Python packages
         run: |
-          python3 -B -m pytest -q -s src/tests
+          ./tools/run_test.py --build-dir /tmp/mvgkit_build

@@ -17,6 +17,12 @@ The current implementations are all done in Python 3, but in the future, the tim
 
 ### Dependencies
 
+#### Pre-commit
+```shell
+pip install pre-commit
+pre-commit install
+```
+
 #### Ubuntu 20.04
 
 ```shell
