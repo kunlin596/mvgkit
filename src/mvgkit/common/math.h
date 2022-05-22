@@ -25,12 +25,12 @@ using Eigen::Vector2f;
  * @param targetDistance
  * @return Matrix3f
  */
-Matrix3f
+inline Matrix3f
 getHomogeneousIsotropicScalingMatrix(const Array2Xf& points, float targetDistance = std::sqrt(2))
 {
   Matrix3f N = Matrix3f::Identity();
   const Array2f mean = points.rowwise().mean();
-  const float sumDistances = (points.colwise() - mean).colwise().norm().sum();
+  const float sumDistances = (points.colwise() - mean).matrix().colwise().norm().sum();
   const float scale = targetDistance * static_cast<float>(points.cols()) / sumDistances;
   N(0, 0) = N(1, 1) = scale;
   N(0, 2) = -mean[0] * scale;

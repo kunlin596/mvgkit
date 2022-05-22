@@ -1,7 +1,6 @@
-#include "../math.h"
+#include "../../mvgkit/common/math.h"
 #include <Eigen/Dense>
 #include <gtest/gtest.h>
-#include <iostream>
 
 TEST(mvgkit_testMath, testHomogeneousIsotropicScalingMatrix)
 {
@@ -19,6 +18,6 @@ TEST(mvgkit_testMath, testHomogeneousIsotropicScalingMatrix)
   EXPECT_NEAR(scaledMean[0], 0.0f, eps);
   EXPECT_NEAR(scaledMean[1], 0.0f, eps);
 
-  float scaledMeanDistance = scaledPoints.colwise().norm().mean();
+  float scaledMeanDistance = scaledPoints.matrix().colwise().norm().mean();
   EXPECT_NEAR(scaledMeanDistance, targetDistance, eps);
 }

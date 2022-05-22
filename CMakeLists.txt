@@ -2,28 +2,75 @@ cmake_minimum_required(VERSION 3.15)
 
 project(mvgkit)
 
-set(CMAKE_CXX_STANDARD 17)
+include(FetchContent)
+include(CTest)
 
+set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+set(CMAKE_CXX_EXTENSIONS OFF)
+set(CMAKE_CXX_COMPILER_LAUNCHER ccache)
+
+#
 # Options
-option(ENABLE_MVGKIT_TESTS OFF)
+#
+
+# Build options
+option(BUILD_MVGKIT_TESTS "Build mvgkit tests or not." OFF)
+option(BUILD_PYTHON_BINDINGS "Build mvgkit Python bindings or not." ON)
+
+# Third-party libraries options
+option(USE_EXTERNAL_JSON "Use external json module or not." OFF)
+option(USE_EXTERNAL_SOPHUS "Use external Sophus module or not." OFF)
 
 # Dependencies
 find_package(OpenCV REQUIRED)
-find_package(Python COMPONENTS Interpreter Development)
-find_package(pybind11 CONFIG)
-find_package(Eigen3 3.3 REQUIRED)
-find_package(Sophus REQUIRED)
 find_package(fmt REQUIRED)
 find_package(Ceres REQUIRED)
+find_package(Eigen3 3.3 REQUIRED NO_MODULE)
+find_package(
+  Boost
+  COMPONENTS filesystem
+  REQUIRED)
 
-# Tests
-if(ENABLE_MVGKIT_TESTS)
-  find_package(GTest 1.10 REQUIRED)
-  if(GTest_FOUND)
-    enable_testing()
-    message(STATUS "Found GTest version: ${GTest_VERSION}.")
-  endif()
+if(NOT USE_EXTERNAL_JSON)
+  FetchContent_Declare(
+    json
+    URL https://github.com/nlohmann/json/releases/download/v3.10.5/json.tar.xz)
+  FetchContent_MakeAvailable(json)
+else()
+  find_package(nlohmann_json 3.10 REQUIRED)
 endif()
+
+if(NOT USE_EXTERNAL_SOPHUS)
+  message(STATUS "MVGKIT: Fetching and enabling Sophus release v22.04.1.")
+  FetchContent_Declare(
+    sophus
+    URL https://github.com/strasdat/Sophus/archive/refs/tags/v22.04.1.tar.gz)
+  set(BUILD_SOPHUS_EXAMPLES
+      OFF
+      CACHE INTERNAL "")
+  set(BUILD_SOPHUS_TESTS
+      OFF
+      CACHE INTERNAL "")
+  FetchContent_MakeAvailable(sophus)
+else()
+  find_package(Sophus REQUIRED)
+endif()
+
+#
+# Build
+#
 
 # Source directory
 add_subdirectory(src)
+
+# Tests
+if(BUILD_MVGKIT_TESTS)
+  message(STATUS "Will build mvgkit cpp tests.")
+  find_package(GTest 1.10 REQUIRED)
+  if(GTest_FOUND)
+    enable_testing()
+    add_subdirectory(src/tests/cpp)
+    message(STATUS "Found GTest version: [${GTest_VERSION}].")
+  endif()
+endif()

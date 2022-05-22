@@ -13,7 +13,7 @@ class ProjectionType(IntEnum):
     kOrthographic = 1
 
 
-from _mvgkit_cppimpl.common import (  # noqa
+from _mvgkit_camera_cppimpl import (  # noqa
     Camera,
     CameraMatrix,
     RadialDistortionModel,

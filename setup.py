@@ -42,6 +42,7 @@ class CMakeBuild(build_ext):
         # EXAMPLE_VERSION_INFO shows you how to pass a value into the C++ code
         # from Python.
         cmake_args = [
+            "-DCMAKE_CXX_COMPILER_LAUNCHER=ccache",
             f"-DCMAKE_LIBRARY_OUTPUT_DIRECTORY={extdir}",
             f"-DPYTHON_EXECUTABLE={sys.executable}",
             f"-DCMAKE_BUILD_TYPE={cfg}",  # not used on MSVC, but no harm
@@ -65,14 +66,13 @@ class CMakeBuild(build_ext):
             # FIXME: Ninja is not working properly need investigation.
             # It's constantly complaining about file not found.
 
-            # if not cmake_generator:
-            #     try:
-            #         import ninja  # noqa: F401
+            if not cmake_generator:
+                try:
+                    import ninja  # noqa: F401
 
-            #         cmake_args += ["-GNinja"]
-            #     except ImportError:
-            #         pass
-            pass
+                    cmake_args += ["-GNinja"]
+                except ImportError:
+                    pass
         else:
 
             # Single config generators are handled "normally"
@@ -111,10 +111,10 @@ class CMakeBuild(build_ext):
         if not os.path.exists(build_temp):
             os.makedirs(build_temp)
 
-        subprocess.check_call(["cmake", ext.sourcedir] + cmake_args, cwd=build_temp)
-        subprocess.check_call(
-            ["cmake", "--build", ".", f"-j{os.cpu_count()}"] + build_args, cwd=build_temp
-        )
+        subprocess.check_call(["cmake", "-S", ext.sourcedir] + cmake_args, cwd=build_temp)
+        build_cmd = ["cmake", "--build", ".", f"-j{os.cpu_count()}", "--target", ext.name]
+        build_cmd += build_args
+        subprocess.check_call(build_cmd, cwd=build_temp)
 
 
 # The information here can also be placed in setup.cfg - better separation of
@@ -128,10 +128,13 @@ setup(
     long_description="",
     packages=find_packages(where="src", exclude=["tests", "*.tests", "*.tests.*", "tests.*"]),
     package_dir={"": "src"},
-    ext_modules=[CMakeExtension("_mvgkit_cppimpl")],
+    ext_modules=[
+        CMakeExtension("_mvgkit_camera_cppimpl"),
+        CMakeExtension("_mvgkit_geometry_cppimpl"),
+        CMakeExtension("_mvgkit_stereo_cppimpl"),
+    ],
     cmdclass={"build_ext": CMakeBuild},
     zip_safe=False,
-    # TODO: add tests
-    # extras_require={"test": ["pytest>=6.0"]},
+    extras_require={"test": ["pytest>=6.0"]},
     python_requires=">=3.6",
 )
