@@ -14,14 +14,18 @@ from scipy.spatial.transform import Rotation
 
 from _mvgkit_stereo_cppimpl import (  # noqa: F401
     EightPoint,
+    Essential,
     Fundamental,
     FundamentalOptions,
     compute_reprojection_residuals,
     get_epilines,
     get_epipole,
+    triangulate_points,
 )
 from mvgkit.basic import SkewSymmetricMatrix3d, get_line_points_in_image
 from mvgkit.homography import Homography2d
+
+EssentialOptions = FundamentalOptions
 
 
 def plot_epipolar_lines(
@@ -85,7 +89,6 @@ def decompose_essential_matrix(*, E_RL: np.ndarray):
     R1_RL = U @ W @ Vt
     R2_RL = U @ W.T @ Vt
 
-    # TODO(kun): Check why these cases can occur
     if np.linalg.det(R1_RL) < 0.0:
         R1_RL = -R1_RL
 

@@ -47,8 +47,7 @@ def leuven_stereo_data_pack(data_root_path):
     points_L = np.asarray([kp.pt for kp in keypoints_L[query_indices]])
     points_R = np.asarray([kp.pt for kp in keypoints_R[train_indices]])
 
-    fundamental = Fundamental(FundamentalOptions())
-    fundamental(x_L=manual_points_L, x_R=manual_points_R)
+    fundamental = Fundamental(FundamentalOptions(), x_L=manual_points_L, x_R=manual_points_R)
     F_RL = fundamental.get_F_RL()
     inlier_indices = fundamental.get_inlier_indices()
 

@@ -66,7 +66,7 @@ public:
 
   bool operator()() { return estimate(); }
   bool estimate() { return _estimate(); }
-  const std::unordered_set<size_t>& getInlierIndices() const
+  const std::vector<size_t>& getInlierIndices() const
   {
     _ensureResult();
     return _inlierIndices;
@@ -97,7 +97,7 @@ private:
     using namespace Eigen;
     size_t iter = 0;
 
-    std::unordered_set<size_t> currInlierIndices;
+    std::vector<size_t> currInlierIndices;
     while (iter < _options.maxIterations) {
       // Sample
       std::unordered_set<size_t> samples =
@@ -110,7 +110,7 @@ private:
       currInlierIndices.clear();
       for (size_t i = 0; i < residuals.size(); ++i) {
         if (residuals[i] < _options.atol) {
-          currInlierIndices.insert(i);
+          currInlierIndices.push_back(i);
         }
       }
 
@@ -132,7 +132,7 @@ private:
 
   bool _dumpDebugInfo = false;
 
-  std::unordered_set<size_t> _inlierIndices;
+  std::vector<size_t> _inlierIndices;
   Parameters _parameters;
 };
 

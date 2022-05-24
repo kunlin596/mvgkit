@@ -102,15 +102,21 @@ _optimize(const Eigen::Array2Xf& x_L,
 
 namespace mvgkit {
 namespace stereo {
+Fundamental::Fundamental(const FundamentalOptions& options,
+                         const Array2Xf& x_L,
+                         const Array2Xf& x_R)
+{
+  std::tie(_F_RL, _inlierIndices) = estimate(options, x_L, x_R);
+}
 
-bool
-Fundamental::estimate(const Array2Xf& x_L, const Array2Xf& x_R)
+std::pair<Matrix3f, InlierIndices>
+Fundamental::estimate(const FundamentalOptions& options, const Array2Xf& x_L, const Array2Xf& x_R)
 {
   using namespace common;
-  auto options = RansacOptions(8, x_L.cols());
-  options.atol = _options.atol;
-  options.maxIterations = _options.maxIterations;
-  auto ransac = Ransac<EigenAnalysisFunctor>(EigenAnalysisFunctor(x_L, x_R), options);
+  auto ransacOptions = RansacOptions(8, x_L.cols());
+  ransacOptions.atol = options.atol;
+  ransacOptions.maxIterations = options.maxIterations;
+  auto ransac = Ransac<EigenAnalysisFunctor>(EigenAnalysisFunctor(x_L, x_R), ransacOptions);
   ransac.estimate();
   const auto numInliers = ransac.getNumInliers();
   BOOST_ASSERT_MSG(
@@ -119,16 +125,15 @@ Fundamental::estimate(const Array2Xf& x_L, const Array2Xf& x_R)
 
   Array2Xf inliers_L(2, numInliers);
   Array2Xf inliers_R(2, numInliers);
+  auto inlierIndices = ransac.getInlierIndices();
   size_t i = 0;
-  _inlierIndices = ransac.getInlierIndices();
-  for (auto inlierIndex : _inlierIndices) {
+  for (auto inlierIndex : inlierIndices) {
     inliers_L.col(i) = x_L.col(inlierIndex);
     inliers_R.col(i) = x_R.col(inlierIndex);
     ++i;
   }
   Matrix3f initialF_RL = EightPoint::EigenAnalysis::compute(inliers_L, inliers_R);
-  _F_RL = _optimize(inliers_L, inliers_R, initialF_RL);
-  return true;
+  return std::make_pair(_optimize(inliers_L, inliers_R, initialF_RL), inlierIndices);
 }
 
 } // stereo

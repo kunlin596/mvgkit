@@ -23,7 +23,7 @@ option(USE_EXTERNAL_JSON "Use external json module or not." OFF)
 option(USE_EXTERNAL_SOPHUS "Use external Sophus module or not." OFF)
 
 # Dependencies
-find_package(OpenCV REQUIRED)
+find_package(OpenCV 4.2 REQUIRED)
 find_package(fmt REQUIRED)
 find_package(Ceres REQUIRED)
 find_package(Eigen3 3.3 REQUIRED NO_MODULE)
@@ -31,6 +31,9 @@ find_package(
   Boost
   COMPONENTS filesystem
   REQUIRED)
+
+# Somehow opencv cannot find the includes...
+include_directories(${OpenCV_INCLUDE_DIRS})
 
 if(NOT USE_EXTERNAL_JSON)
   FetchContent_Declare(

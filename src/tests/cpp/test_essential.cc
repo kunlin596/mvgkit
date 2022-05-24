@@ -1,17 +1,18 @@
+
 #include "../../mvgkit/common/transformation.h"
 #include "../../mvgkit/io/json_utils.h"
 #include "../../mvgkit/stereo/common.h"
+#include "../../mvgkit/stereo/essential.h"
 #include "utils.h"
 #include <Eigen/Dense>
 #include <fmt/format.h>
 #include <gtest/gtest.h>
-
 namespace {
 using namespace Eigen;
 using namespace mvgkit;
 }
 
-TEST(TestStereoCommon, TestTriangulatePoint)
+TEST(TestStereoEssential, TestEssentialEstimation)
 {
   // Some random camera matrix
   common::CameraMatrix cameraMatrix(520.0f, 520.0f, 325.0f, 250.0f, 0.0f);
@@ -25,8 +26,10 @@ TEST(TestStereoCommon, TestTriangulatePoint)
   Eigen::Array3Xf points_R =
     (pose_RL.matrix() * points_L.matrix().colwise().homogeneous()).topRows(3).array();
   Eigen::Array2Xf imagePoints_R = cameraMatrix.project(points_R);
-  Eigen::Array3Xf triangulatedPoints_L =
-    stereo::triangulatePoints(imagePoints_L, imagePoints_R, cameraMatrix, pose_RL);
-  Eigen::ArrayXf distances = (points_L - triangulatedPoints_L).matrix().colwise().norm();
-  EXPECT_EQ((distances < 0.001f).count(), points_L.cols());
+
+  stereo::EssentialOptions options;
+  auto essential = stereo::Essential(options, imagePoints_L, imagePoints_R, cameraMatrix);
+  auto estimatedPose_RL = essential.getPose_RL();
+  EXPECT_NEAR((estimatedPose_RL.translation() - pose_RL.translation()).norm(), 0.0f, 1e-5f);
+  EXPECT_NEAR((estimatedPose_RL.rotationMatrix() - pose_RL.rotationMatrix()).norm(), 0.0f, 1e-5f);
 }

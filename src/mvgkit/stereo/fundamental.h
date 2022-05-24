@@ -1,9 +1,9 @@
 #pragma once
 #include "../common/math.h"
 #include "../common/ransac.h"
+#include "common.h"
 #include <boost/assert.hpp>
 #include <memory>
-#include <unordered_set>
 
 namespace mvgkit {
 namespace stereo {
@@ -30,27 +30,39 @@ public:
   using Ptr = std::shared_ptr<Fundamental>;
   using ConstPtr = std::shared_ptr<const Fundamental>;
 
-  // TODO: Add options
-  Fundamental(const FundamentalOptions& options)
-    : _options(options)
-  {
-  }
+  Fundamental(const FundamentalOptions& options, const Array2Xf& x_L, const Array2Xf& x_R);
   virtual ~Fundamental() {}
 
-  bool estimate(const Array2Xf& x_L, const Array2Xf& x_R);
+  /**
+   * @brief Estimate the fundamental matrix
+   *
+   * @param options options
+   * @param x_L image points in frame (L)
+   * @param x_R image points in frame (R)
+   * @return std::pair<Matrix3f, InlierIndices>
+   */
+  static std::pair<Matrix3f, InlierIndices> estimate(const FundamentalOptions& options,
+                                                     const Array2Xf& x_L,
+                                                     const Array2Xf& x_R);
 
-  bool operator()(const Array2Xf& x_L, const Array2Xf& x_R) { return estimate(x_L, x_R); }
-
-  const std::unordered_set<size_t>& getInlierIndices() const { return _inlierIndices; }
-
+  /**
+   * @brief Get the estimated fundamental matrix
+   *
+   * @return const Matrix3f&
+   */
   const Matrix3f& getF_RL() const { return _F_RL; }
 
-  const FundamentalOptions& getOptions() const { return _options; }
+  /**
+   * @brief Get inlier indices from RANSAC process.
+   *
+   * @return const InlierIndices&
+   */
+  const InlierIndices& getInlierIndices() const { return _inlierIndices; }
 
 private:
-  std::unordered_set<size_t> _inlierIndices;
+  // Outputs
   Matrix3f _F_RL;
-  FundamentalOptions _options;
+  InlierIndices _inlierIndices;
 };
 
 } // stereo

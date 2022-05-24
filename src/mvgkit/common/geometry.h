@@ -6,6 +6,7 @@ namespace common {
 
 using Eigen::Array2f;
 using Eigen::Array2Xf;
+using Eigen::Array3f;
 using Eigen::Array3Xf;
 using Eigen::ArrayXf;
 using Eigen::Matrix3f;
