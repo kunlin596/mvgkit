@@ -91,8 +91,7 @@ TEST_F(FundamentalManuallyAssociatedPointsTest, TestFundamental)
   float distanceAbsThres = 4.0f;
   float distanceRmsThres = 4.0f;
   FundamentalOptions options(1000, 2.8f);
-  auto fundamental = Fundamental(options);
-  fundamental(_manualPoints_L, _manualPoints_R);
+  auto fundamental = Fundamental(options, _manualPoints_L, _manualPoints_R);
   auto F_RL = fundamental.getF_RL();
   auto inlierIndices = fundamental.getInlierIndices();
   EXPECT_EQ(inlierIndices.size(), inlierIndices.size());

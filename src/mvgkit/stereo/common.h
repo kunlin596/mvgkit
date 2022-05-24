@@ -1,5 +1,6 @@
 #pragma once
-
+#include "../common/camera.h"
+#include "../common/transformation.h"
 #include <Eigen/Dense>
 #include <Eigen/Eigenvalues>
 
@@ -86,6 +87,42 @@ homogeneousKronecker(const Eigen::Vector2f& vec1, const Eigen::Vector2f& vec2);
 
 Eigen::Matrix3f
 imposeFundamentalMatrixRank(const Eigen::Matrix3f& F_RL);
+
+/**
+ * @brief Triangulate a point from two-view.
+ *
+ * This function assumes the both views are from the same camera.
+ *
+ * @param imagePoint_L image point in frame (L)
+ * @param imagePoint_R image point in frame (R)
+ * @param cameraMatrix camera matrix for both views
+ * @param T_RL extrinsics of the right camera
+ * @return Eigen::Array3f triangulated point in the frame (L)
+ */
+Eigen::Array3f
+triangulatePoint(const Eigen::Array2f& imagePoint_L,
+                 const Eigen::Array2f& imagePoint_R,
+                 const mvgkit::common::CameraMatrix& cameraMatrix,
+                 const mvgkit::common::SE3f& T_RL);
+
+/**
+ * @brief Triangulate corresponding points from two-view.
+ *
+ * This function assumes the both views are from the same camera.
+ *
+ * @param imagePoints_L image points in frame (L)
+ * @param imagePoints_R image points in frame (R)
+ * @param cameraMatrix camera matrix for both views
+ * @param T_RL extrinsics of the right camera
+ * @return Eigen::Array3Xf triangulated points in the frame (L)
+ */
+Eigen::Array3Xf
+triangulatePoints(const Eigen::Array2Xf& imagePoints_L,
+                  const Eigen::Array2Xf& imagePoints_R,
+                  const mvgkit::common::CameraMatrix& cameraMatrix,
+                  const mvgkit::common::SE3f& T_RL);
+
+using InlierIndices = std::vector<size_t>;
 
 } // stereo
 } // mvgkit

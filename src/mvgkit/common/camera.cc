@@ -117,7 +117,7 @@ Camera::projectPoints(const Array3Xf& points3d_W, bool distort) const
     // TODO
   }
   Array3Xf points3d_C =
-    (_pose_CW.rotationMatrix() * points3d_W.matrix()).colwise() + _pose_CW.translation();
+    (_pose_CW.matrix3x4() * points3d_W.matrix().colwise().homogeneous()).array();
   return _K.project(points3d_C);
 }
 
