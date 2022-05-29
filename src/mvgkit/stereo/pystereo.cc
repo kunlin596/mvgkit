@@ -1,5 +1,6 @@
 #include "eight_point.h"
 #include "essential.h"
+#include "triangulation.h"
 #include <pybind11/eigen.h>
 #include <pybind11/pybind11.h>
 #include <pybind11/stl.h>
@@ -30,7 +31,8 @@ add_stereo_module(py::module& m)
      },
      "x_R"_a,
      "F_RL"_a)
-    .def("get_epipole", &mvgkit::stereo::getEpipole<float>, "F_RL"_a)
+    .def("get_homo_epipole", &mvgkit::stereo::getHomoEpipole<double>, "F_RL"_a)
+    .def("get_epipole", &mvgkit::stereo::getEpipole<double>, "F_RL"_a)
     .def(
       "compute_reprojection_residuals",
       [](const Matrix3f& F_RL, const ArrayX2f& x_L, const ArrayX2f& x_R) {
@@ -80,28 +82,69 @@ add_stereo_module(py::module& m)
          const ArrayX2f& x_R) -> std::pair<Matrix3f, InlierIndices> {
         return Fundamental::estimate(options, x_L.transpose(), x_R.transpose());
       },
-      "optinos"_a,
+      "options"_a,
       "x_L"_a,
       "x_R"_a)
     .def("get_inlier_indices", &Fundamental::getInlierIndices)
     .def("get_F_RL", &Fundamental::getF_RL);
 
-  m.def(
-    "triangulate_points",
-    [](const ArrayX2f& x_L,
-       const ArrayX2f& x_R,
-       const CameraMatrix& cameraMatrix,
-       const Matrix3f& rotationMatrix,
-       const Vector3f& translation) -> Array3Xf {
-      return triangulatePoints(
-               x_L.transpose(), x_R.transpose(), cameraMatrix, SE3f(rotationMatrix, translation))
-        .transpose();
-    },
-    "x_L"_a,
-    "x_R"_a,
-    "cameraMatrix"_a,
-    "rotationMatrix"_a,
-    "translation"_a);
+  py::class_<Triangulation>(m, "Triangulation")
+    .def_static(
+      "compute_mid_point_triangulation",
+      [](const ArrayX2f& x_L,
+         const ArrayX2f& x_R,
+         const CameraMatrix& cameraMatrix,
+         const Matrix3f& rotationMatrix,
+         const Vector3f& translation) -> ArrayX3f {
+        return Triangulation::computeMidPointTriangulation(
+                 x_L.transpose(), x_R.transpose(), cameraMatrix, SE3f(rotationMatrix, translation))
+          .transpose();
+      },
+      "x_L"_a,
+      "x_R"_a,
+      "cameraMatrix"_a,
+      "rotationMatrix"_a,
+      "translation"_a)
+    .def_static(
+      "get_geometric_image_point_pair_correction",
+      [](const Eigen::ArrayX2f& imagePoints_L,
+         const Eigen::ArrayX2f& imagePoints_R,
+         const Eigen::Matrix3f& F_RL) -> Eigen::ArrayX4f {
+        return Triangulation::getGeometricImagePointPairCorrection(
+                 imagePoints_L.transpose(), imagePoints_R.transpose(), F_RL)
+          .transpose();
+      },
+      "image_point_L"_a,
+      "image_point_R"_a,
+      "F_RL"_a)
+    .def_static(
+      "get_optimal_polynomial_image_point_pairs",
+      [](const Eigen::ArrayX2d& imagePoints_L,
+         const Eigen::ArrayXXd& imagePoints_R,
+         const Eigen::Matrix3d& F_RL) -> std::pair<Eigen::ArrayX2d, Eigen::ArrayX2d> {
+        auto&& [x_L, x_R] = Triangulation::getOptimalPolynomialImagePointPairs(
+          imagePoints_L.transpose(), imagePoints_R.transpose(), F_RL);
+        return { x_L.transpose(), x_R.transpose() };
+      },
+      "image_point_L"_a,
+      "image_point_R"_a,
+      "F_RL"_a)
+    .def_static(
+      "compute_optimal_triangulation",
+      [](const ArrayX2f& x_L,
+         const ArrayX2f& x_R,
+         const CameraMatrix& cameraMatrix,
+         const Matrix3f& R_RL,
+         const Vector3f& t_RL) -> ArrayX3f {
+        return Triangulation::computeOptimalTriangulation(
+                 x_L.transpose(), x_R.transpose(), cameraMatrix, SE3f(R_RL, t_RL))
+          .transpose();
+      },
+      "x_L"_a,
+      "x_R"_a,
+      "cameraMatrix"_a,
+      "R_RL"_a,
+      "t_RL"_a);
 
   m.def("homogeneous_kronecker_2d", &homogeneousKronecker, "vec1"_a, "vec2"_a);
 
