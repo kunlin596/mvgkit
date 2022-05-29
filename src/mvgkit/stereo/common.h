@@ -3,6 +3,7 @@
 #include "../common/transformation.h"
 #include <Eigen/Dense>
 #include <Eigen/Eigenvalues>
+#include <iostream>
 
 namespace mvgkit {
 namespace stereo {
@@ -19,7 +20,7 @@ template<typename T>
 using Matrix3 = Eigen::Matrix<T, 3, 3>;
 
 /**
- * @brief Get the epipole in the left view
+ * @brief Get the homogeneous epipole in the left view
  *
  * To get the epipole in the right view, simply transpose the F matrix.
  *
@@ -28,17 +29,33 @@ using Matrix3 = Eigen::Matrix<T, 3, 3>;
  * of F_RL.T and it's corresponding to the smallest eigen value of F_RL.T.
  *
  * @param F_RL fundamental matrix
- * @return Eigen::Vector2f epipole in the left view
+ * @return Eigen::Vector3<T> homogeneous epipole in the left view
+ */
+template<typename T = float>
+Vector3<T>
+getHomoEpipole(const Matrix3<T>& F_RL)
+{
+  using namespace Eigen;
+  JacobiSVD<Matrix3<T>> svdSolver(F_RL, ComputeFullU | ComputeFullV);
+  int minIndex;
+  svdSolver.singularValues().minCoeff(&minIndex);
+  return svdSolver.matrixU().col(minIndex);
+}
+
+/**
+ * @brief Get the non-homogeneous epipole in the left view
+ *
+ * See `getHomoEpipole` for more information.
+ *
+ * @tparam T
+ * @param F_RL fundamental matrix
+ * @return Eigen::Vector2<T> non-homogeneous epipole in the left view
  */
 template<typename T = float>
 Vector2<T>
 getEpipole(const Matrix3<T>& F_RL)
 {
-  using namespace Eigen;
-  EigenSolver<Matrix3<T>> solver(F_RL.transpose());
-  int minIndex;
-  solver.eigenvalues().real().minCoeff(&minIndex);
-  Vector3<T> homoEpipole = solver.eigenvectors().col(minIndex).real();
+  Vector3<T> homoEpipole = getHomoEpipole<T>(F_RL);
   return homoEpipole.topRows(2) / homoEpipole[2];
 }
 
@@ -87,40 +104,6 @@ homogeneousKronecker(const Eigen::Vector2f& vec1, const Eigen::Vector2f& vec2);
 
 Eigen::Matrix3f
 imposeFundamentalMatrixRank(const Eigen::Matrix3f& F_RL);
-
-/**
- * @brief Triangulate a point from two-view.
- *
- * This function assumes the both views are from the same camera.
- *
- * @param imagePoint_L image point in frame (L)
- * @param imagePoint_R image point in frame (R)
- * @param cameraMatrix camera matrix for both views
- * @param T_RL extrinsics of the right camera
- * @return Eigen::Array3f triangulated point in the frame (L)
- */
-Eigen::Array3f
-triangulatePoint(const Eigen::Array2f& imagePoint_L,
-                 const Eigen::Array2f& imagePoint_R,
-                 const mvgkit::common::CameraMatrix& cameraMatrix,
-                 const mvgkit::common::SE3f& T_RL);
-
-/**
- * @brief Triangulate corresponding points from two-view.
- *
- * This function assumes the both views are from the same camera.
- *
- * @param imagePoints_L image points in frame (L)
- * @param imagePoints_R image points in frame (R)
- * @param cameraMatrix camera matrix for both views
- * @param T_RL extrinsics of the right camera
- * @return Eigen::Array3Xf triangulated points in the frame (L)
- */
-Eigen::Array3Xf
-triangulatePoints(const Eigen::Array2Xf& imagePoints_L,
-                  const Eigen::Array2Xf& imagePoints_R,
-                  const mvgkit::common::CameraMatrix& cameraMatrix,
-                  const mvgkit::common::SE3f& T_RL);
 
 using InlierIndices = std::vector<size_t>;
 

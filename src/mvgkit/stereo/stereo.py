@@ -4,111 +4,27 @@
 
 from dataclasses import dataclass
 from itertools import product
-from math import pi, sqrt
+from math import sqrt
 from typing import Optional
 
 import cv2
 import numpy as np
 from scipy.optimize import least_squares
-from scipy.spatial.transform import Rotation
 
 from _mvgkit_stereo_cppimpl import (  # noqa: F401
     EightPoint,
     Essential,
     Fundamental,
     FundamentalOptions,
+    Triangulation,
     compute_reprojection_residuals,
     get_epilines,
     get_epipole,
-    triangulate_points,
 )
-from mvgkit.basic import SkewSymmetricMatrix3d, get_line_points_in_image
+from mvgkit.basic import SkewSymmetricMatrix3d
 from mvgkit.homography import Homography2d
 
 EssentialOptions = FundamentalOptions
-
-
-def plot_epipolar_lines(
-    image_L: np.ndarray,
-    image_R: np.ndarray,
-    points_L: np.ndarray,
-    points_R: np.ndarray,
-    F_RL: np.ndarray,
-):
-    import matplotlib.pyplot as plt
-
-    colors = np.random.random((len(points_L), 3)) * 0.7 + 0.1
-
-    def _plot_line(ax, lines, width, height):
-        for i, l in enumerate(lines):
-            points = get_line_points_in_image(l, width, height)
-            ax.plot(points[:, 0], points[:, 1], alpha=0.8, color=colors[i])
-
-    _, (ax1, ax2) = plt.subplots(1, 2, sharey=True, sharex=True)
-
-    width = image_L.shape[1]
-    height = image_L.shape[0]
-
-    ax1.set_title("Corresponding epilines of (R) in (L)")
-    ax1.imshow(image_L)
-    ax1.set_xlim([0, width])
-    ax1.set_ylim([height, 0])
-    left_lines = get_epilines(x_R=points_R, F_RL=F_RL)
-    left_epipole = get_epipole(F_RL)
-    _plot_line(ax1, left_lines, width, height)
-    ax1.scatter(points_L[:, 0], points_L[:, 1], color=colors)
-    ax1.scatter([left_epipole[0]], [left_epipole[1]], color="r", s=30.0, alpha=1.0)
-
-    width = image_R.shape[1]
-    height = image_R.shape[0]
-
-    ax2.set_title("Corresponding epilines of (L) in (R)")
-    ax2.imshow(image_R)
-    ax2.set_xlim([0, width])
-    ax2.set_ylim([height, 0])
-    right_lines = get_epilines(x_R=points_L, F_RL=F_RL.T)
-    right_epipole = get_epipole(F_RL.T)
-    _plot_line(ax2, right_lines, width, height)
-    ax2.scatter(points_R[:, 0], points_R[:, 1], color=colors)
-    ax2.scatter([right_epipole[0]], [right_epipole[1]], color="r", s=30.0, alpha=1.0)
-
-    plt.tight_layout()
-    plt.show()
-
-
-def decompose_essential_matrix(*, E_RL: np.ndarray):
-    """Decompose essential matrix describing the change of frame from (L) to (R)."""
-    U, _, Vt = np.linalg.svd(E_RL)
-
-    W = Rotation.from_euler("zyx", [pi / 2.0, 0, 0]).as_matrix()
-
-    # Since cross(t, E) = 0 which means t is the left singular vector
-    # associated with the 0 singular value>
-    t_R = U[:, -1]
-
-    R1_RL = U @ W @ Vt
-    R2_RL = U @ W.T @ Vt
-
-    if np.linalg.det(R1_RL) < 0.0:
-        R1_RL = -R1_RL
-
-    if np.linalg.det(R2_RL) < 0.0:
-        R2_RL = -R2_RL
-
-    assert np.allclose(t_R @ R1_RL, t_R @ R2_RL)
-    return R1_RL, R2_RL, t_R
-
-
-def triangulate(P1, P2, points1, points2):
-    """Use projection matrices and pixels coordinates to find out the 3D points.
-
-    Projection matrix must be a 3x4 augmented matrix.
-
-    TODO(kun): Replace OpenCV usage.
-    """
-    object_points = cv2.triangulatePoints(P1, P2, points1.T, points2.T).T
-    object_points /= object_points[:, -1].reshape(-1, 1)
-    return object_points[:, :3]
 
 
 class AffinityRecoverySolver:
