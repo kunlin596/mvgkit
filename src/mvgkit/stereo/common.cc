@@ -36,37 +36,5 @@ homogeneousKronecker(const Eigen::Vector2f& vec1, const Eigen::Vector2f& vec2)
   return vec;
 }
 
-Eigen::Array3f
-triangulatePoint(const Eigen::Array2f& imagePoint_L,
-                 const Eigen::Array2f& imagePoint_R,
-                 const common::CameraMatrix& cameraMatrix,
-                 const common::SE3f& T_RL)
-{
-  using namespace Eigen;
-  Matrix3f K = cameraMatrix.asMatrix();
-  Matrix3f xHat_R = Sophus::SO3<float>::hat(imagePoint_R.matrix().homogeneous());
-  float a = (-xHat_R * K * T_RL.translation())[0];
-  float b =
-    (xHat_R * K * T_RL.rotationMatrix() * K.inverse() * imagePoint_L.matrix().homogeneous())[0];
-  float s_L = a / b;
-  return (s_L * K.inverse() * imagePoint_L.matrix().homogeneous()).array();
-}
-
-Eigen::Array3Xf
-triangulatePoints(const Eigen::Array2Xf& imagePoints_L,
-                  const Eigen::Array2Xf& imagePoints_R,
-                  const common::CameraMatrix& cameraMatrix,
-                  const common::SE3f& T_RL)
-{
-  BOOST_ASSERT(imagePoints_L.cols() == imagePoints_R.cols());
-  const size_t numPoints = imagePoints_L.cols();
-  Eigen::Array3Xf points3d_L(3, numPoints);
-  for (size_t i = 0; i < numPoints; ++i) {
-    points3d_L.col(i) =
-      triangulatePoint(imagePoints_L.col(i), imagePoints_R.col(i), cameraMatrix, T_RL);
-  }
-  return points3d_L;
-}
-
 } // common
 } // stereo

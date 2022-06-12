@@ -21,8 +21,7 @@ def fundamental_rms_threshold():
 
 @fixture
 def stereo_reprojection_rms_threshold():
-    # TODO: decrease after implementing pose recovery outlier filtering
-    return 5.0
+    return 0.72
 
 
 @fixture
