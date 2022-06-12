@@ -1,5 +1,5 @@
-add_library(mvgkit_common SHARED camera.h camera.cc geometry.h geometry.cc
-                                 ransac.h)
+add_library(mvgkit_common SHARED math.h camera.h camera.cc geometry.h
+                                 geometry.cc ransac.h)
 target_link_libraries(mvgkit_common PUBLIC Eigen3::Eigen Sophus::Sophus
                                            opencv_core mvgkit_io)
 install(TARGETS mvgkit_common LIBRARY DESTINATION lib)
