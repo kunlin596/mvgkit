@@ -281,7 +281,7 @@ def normalize_vectors(x, axis=None):
     else:
         if axis is None:
             axis = 1
-        return x / np.linalg.norm(x, axis=axis)
+        return x / np.linalg.norm(x, axis=axis, keepdims=1)
 
 
 def get_line_points_in_image(line: np.ndarray, width: float, height: float):

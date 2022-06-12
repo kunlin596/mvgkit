@@ -136,5 +136,21 @@ Fundamental::estimate(const FundamentalOptions& options, const Array2Xf& x_L, co
   return std::make_pair(_optimize(inliers_L, inliers_R, initialF_RL), inlierIndices);
 }
 
+Matrix3f
+Fundamental::getFromEssential(const common::CameraMatrix& cameraMatrix, const Matrix3f& E_RL)
+{
+  const Eigen::Matrix3f Kinv = cameraMatrix.asMatrix().inverse();
+  return Kinv.transpose() * E_RL * Kinv;
+}
+
+Matrix3f
+Fundamental::getFromPose(const common::CameraMatrix& cameraMatrix,
+                         const Matrix3f& R_RL,
+                         const Vector3f& t_RL)
+{
+  const Eigen::Matrix3f E_RL = R_RL.transpose() * Sophus::SO3f::hat(t_RL).transpose();
+  return Fundamental::getFromEssential(cameraMatrix, E_RL);
+}
+
 } // stereo
 } // mvgkit

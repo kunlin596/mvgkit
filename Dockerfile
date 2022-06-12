@@ -1,24 +1,38 @@
 FROM ubuntu:20.04
 
-# Setup
-COPY ./ /opt/src/mvgkit
-WORKDIR /opt/src/mvgkit
-
 # Install dependencies
-RUN DEBIAN_FRONTEND=noninteractive \
-    ./tools/install_dependencies_ubuntu.sh
+RUN apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y -qq \
+    ccache \
+    cmake \
+    make \
+    flake8 \
+    valgrind \
+    python3-pip \
+    python3-opencv \
+    libpython3-dev \
+    pybind11-dev \
+    libfmt-dev \
+    libopencv-dev \
+    libceres-dev \
+    libgtest-dev \
+    libboost-system-dev \
+    libboost-filesystem-dev
+
+# Setup
+COPY ./ /opt/src/mvgkit/
+WORKDIR /opt/src/mvgkit/
 
 # C++ build
 RUN \
-    cmake -S . -B /opt/build -DENABLE_MVGKIT_TESTS=ON -DCMAKE_BUILD_TYPE=Release && \
+    cmake -S . -B /opt/build -DBUILD_MVGKIT_TESTS=ON -DCMAKE_BUILD_TYPE=Release && \
     cmake --build /opt/build/ --target install -j16 --config Release
 
 # Python build
-RUN python3 -m pip install .
+RUN python3 setup.py build -j 16 install
 
 # Tests
 RUN \
-    python3 /opt/src/mvgkit/tools/run_tests.py --build-dir /opt/build
+    python3 /opt/src/mvgkit/tools/run_test.py --build-dir /opt/build -p 16 -v
 
 # Cleanup
 RUN rm -rf /opt/src/mvgkit /opt/build

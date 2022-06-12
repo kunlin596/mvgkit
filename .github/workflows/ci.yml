@@ -47,4 +47,4 @@ jobs:
           python setup.py build -j 16 install
       - name: Test Python packages
         run: |
-          ./tools/run_test.py --build-dir /tmp/mvgkit_build
+          ./tools/run_test.py --build-dir /tmp/mvgkit_build -p -1 -v
