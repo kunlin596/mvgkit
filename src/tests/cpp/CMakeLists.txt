@@ -30,7 +30,7 @@ add_executable(test_fundamental test_fundamental.cc)
 target_link_libraries(
   test_fundamental
   mvgkit_io
-  mvgkit_stereo_fundamental
+  mvgkit_stereo
   mvgkit_testing_utils
   mvgkit_common
   Eigen3::Eigen
@@ -38,24 +38,24 @@ target_link_libraries(
   GTest::Main)
 add_test(mvgkit_testFundamental test_fundamental)
 
-# Stereo Common
-add_executable(test_stereo_common test_stereo_common.cc)
+# Triangulation
+add_executable(test_triangulation test_triangulation.cc)
 target_link_libraries(
-  test_stereo_common
+  test_triangulation
   mvgkit_common
-  mvgkit_stereo_common
+  mvgkit_stereo
   mvgkit_io
   mvgkit_testing_utils
   Eigen3::Eigen
   GTest::GTest
   GTest::Main)
-add_test(mvgkit_testStereoCommon test_stereo_common)
+add_test(mvgkit_testTriangulation test_triangulation)
 
 add_executable(test_essential test_essential.cc)
 target_link_libraries(
   test_essential
   mvgkit_io
-  mvgkit_stereo_fundamental
+  mvgkit_stereo
   mvgkit_testing_utils
   mvgkit_common
   Eigen3::Eigen
