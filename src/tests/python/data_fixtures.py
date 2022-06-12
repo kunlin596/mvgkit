@@ -8,7 +8,7 @@ from pytest import fixture
 from mvgkit.camera import CameraMatrix
 from mvgkit.features import SIFT, Matcher
 from mvgkit.image_processing import Image
-from mvgkit.stereo import Fundamental, FundamentalOptions
+from mvgkit.stereo.stereo import Fundamental, FundamentalOptions
 
 
 @dataclass
@@ -31,9 +31,9 @@ def leuven_stereo_data_pack(data_root_path):
         meta = json.load(f)
 
     assert meta.get("manualPointsL") is not None
-    manual_points_L = np.asarray(meta["manualPointsL"])
+    manual_points_L = np.asarray(meta["manualPointsL"], dtype=float)
     assert meta.get("manualPointsR") is not None
-    manual_points_R = np.asarray(meta["manualPointsR"])
+    manual_points_R = np.asarray(meta["manualPointsR"], dtype=float)
 
     image_L = Image.from_file(str(fundamental_root_path / meta["left"])).data
     image_R = Image.from_file(str(fundamental_root_path / meta["right"])).data
@@ -47,8 +47,10 @@ def leuven_stereo_data_pack(data_root_path):
     points_L = np.asarray([kp.pt for kp in keypoints_L[query_indices]])
     points_R = np.asarray([kp.pt for kp in keypoints_R[train_indices]])
 
-    fundamental = Fundamental(FundamentalOptions(), x_L=manual_points_L, x_R=manual_points_R)
-    F_RL = fundamental.get_F_RL()
+    fundamental = Fundamental(
+        FundamentalOptions(atol=20.0), x_L=manual_points_L, x_R=manual_points_R
+    )
+    F_RL = fundamental.get_F_RL().astype(np.float64)
     inlier_indices = fundamental.get_inlier_indices()
 
     return StereoDataPack(
