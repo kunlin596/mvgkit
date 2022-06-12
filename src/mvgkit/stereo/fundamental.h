@@ -1,4 +1,5 @@
 #pragma once
+#include "../common/camera.h"
 #include "../common/math.h"
 #include "../common/ransac.h"
 #include "common.h"
@@ -58,6 +59,27 @@ public:
    * @return const InlierIndices&
    */
   const InlierIndices& getInlierIndices() const { return _inlierIndices; }
+
+  /**
+   * @brief Get fundamental matrix from frame (L) to frame (R) using essential matrix.
+   *
+   * @param cameraMatrix camera matrix
+   * @param E_RL essential matrix from frame (L) to (R)
+   * @return Matrix3f fundamental matrix from frame (L) to frame (R)
+   */
+  static Matrix3f getFromEssential(const common::CameraMatrix& cameraMatrix, const Matrix3f& E_RL);
+
+  /**
+   * @brief Get fundamental matrix from frame (L) to frame (R) using essential matrix.
+   *
+   * @param cameraMatrix camera matrix
+   * @param R_RL rotation matrix from frame (L) to frame (R)
+   * @param t_RL translation vector from frame (L) to frame (R)
+   * @return Matrix3f fundamental matrix from frame (L) to frame (R)
+   */
+  static Matrix3f getFromPose(const common::CameraMatrix& cameraMatrix,
+                              const Matrix3f& R_RL,
+                              const Vector3f& t_RL);
 
 private:
   // Outputs

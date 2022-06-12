@@ -1,5 +1,5 @@
 #include "essential.h"
-#include "common.h"
+#include "triangulation.h"
 #include <Eigen/SVD>
 
 namespace mvgkit {
@@ -72,8 +72,8 @@ Essential::test(const std::array<SE3f, 4>& transformations_RL,
   Array3Xf points;
   SE3f transformation_RL;
   for (const auto& currTransformation_RL : transformations_RL) {
-    Array3Xf currPoints =
-      triangulatePoints(imagePoints_L, imagePoints_R, cameraMatrix, currTransformation_RL);
+    Array3Xf currPoints = Triangulation::ComputeOptimalTriangulation(
+      imagePoints_L, imagePoints_R, cameraMatrix, currTransformation_RL);
     size_t currCount = (currPoints.row(2) > 0.0f).count();
     if (currCount > count) {
       count = currCount;
