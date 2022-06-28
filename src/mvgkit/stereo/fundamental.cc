@@ -47,7 +47,7 @@ struct _ReprojectionError
     residual[0] = distance_L[0];
     residual[1] = distance_R[0];
     return true;
-  };
+  }
 
   static ceres::CostFunction* create(double x_L, double y_L, double x_R, double y_R)
 

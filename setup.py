@@ -129,9 +129,11 @@ setup(
     packages=find_packages(where="src", exclude=["tests", "*.tests", "*.tests.*", "tests.*"]),
     package_dir={"": "src"},
     ext_modules=[
+        CMakeExtension("_mvgkit_algorithms_cppimpl"),
         CMakeExtension("_mvgkit_camera_cppimpl"),
         CMakeExtension("_mvgkit_geometry_cppimpl"),
         CMakeExtension("_mvgkit_stereo_cppimpl"),
+        CMakeExtension("_mvgkit_transformation_cppimpl"),
     ],
     cmdclass={"build_ext": CMakeBuild},
     zip_safe=False,

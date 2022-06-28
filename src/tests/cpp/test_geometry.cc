@@ -9,7 +9,7 @@ using namespace Eigen;
 using namespace mvgkit;
 }
 
-TEST(mvgkit_testGeometry, TestTransformLines2D)
+TEST(GeometryTests, TestTransformLines2D)
 {
   // TODO: Think about improving the precision.
   constexpr float eps = 1e-5;
@@ -30,7 +30,7 @@ TEST(mvgkit_testGeometry, TestTransformLines2D)
   EXPECT_NEAR(transformedLine(2, 0), -12.32050808, eps);
 }
 
-TEST(mvgkit_testGeometry, TestComputeAssociatedPointLineDistances)
+TEST(GeometryTests, TestComputeAssociatedPointLineDistances)
 {
 
   // TODO: Think about improving the precision.
@@ -84,7 +84,7 @@ TEST(mvgkit_testGeometry, TestComputeAssociatedPointLineDistances)
   EXPECT_NEAR(distances[9], 2.0f, eps);
 }
 
-TEST(mvgkit_testGeometry, TestIntersectLines2D)
+TEST(GeometryTests, TestIntersectLines2D)
 {
   Eigen::Array<float, 3, -1> lines(3, 4);
   lines.row(0) = Eigen::ArrayXf::LinSpaced(4, 1.0f, 4.0f).transpose();
@@ -93,4 +93,19 @@ TEST(mvgkit_testGeometry, TestIntersectLines2D)
   auto intersection = common::intersectLines2D(lines);
   EXPECT_NEAR(intersection[0], 0.0f, 1e-6f);
   EXPECT_NEAR(intersection[1], 0.0f, 1e-6f);
+}
+
+TEST(GeometryTests, TestBarycentricCoordinates)
+{
+  Eigen::Matrix<double, 2, Eigen::Dynamic> referencePoints(2, 3);
+  referencePoints.col(0) << 1.0, 1.0;
+  referencePoints.col(1) << 2.0, 1.0;
+  referencePoints.col(2) << 1.0, 2.0;
+
+  Eigen::Vector2d queryPoint{ 1.5, 1.5 };
+  Eigen::VectorXd coords = common::getBarycentricCoordinates<2>(referencePoints, queryPoint);
+  EXPECT_EQ(coords.rows(), 3);
+  EXPECT_NEAR(coords[0], 0.0, 1e-16);
+  EXPECT_NEAR(coords[1], 0.5, 1e-16);
+  EXPECT_NEAR(coords[2], 0.5, 1e-16);
 }
