@@ -21,12 +21,12 @@ option(BUILD_PYTHON_BINDINGS "Build mvgkit Python bindings or not." ON)
 # Third-party libraries options
 option(USE_EXTERNAL_JSON "Use external json module or not." OFF)
 option(USE_EXTERNAL_SOPHUS "Use external Sophus module or not." OFF)
+option(USE_EXTERNAL_EIGEN "Use external Eigen module or not." ON)
 
 # Dependencies
 find_package(OpenCV 4.2 REQUIRED)
 find_package(fmt REQUIRED)
 find_package(Ceres REQUIRED)
-find_package(Eigen3 3.3 REQUIRED NO_MODULE)
 find_package(
   Boost
   COMPONENTS filesystem
@@ -34,6 +34,20 @@ find_package(
 
 # Somehow opencv cannot find the includes...
 include_directories(${OpenCV_INCLUDE_DIRS})
+
+if(NOT USE_EXTERNAL_EIGEN)
+  FetchContent_Declare(
+    Eigen3
+    GIT_REPOSITORY https://gitlab.com/libeigen/eigen.git
+    GIT_TAG 3.4
+    GIT_SHALLOW TRUE
+    GIT_PROGRESS TRUE)
+  set(EIGEN_BUILD_DOC OFF)
+  set(EIGEN_BUILD_PKGCONFIG OFF)
+  FetchContent_MakeAvailable(Eigen3)
+else()
+  find_package(Eigen3 3.3 REQUIRED)
+endif()
 
 if(NOT USE_EXTERNAL_JSON)
   FetchContent_Declare(

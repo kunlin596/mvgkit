@@ -4,19 +4,20 @@ FROM ubuntu:20.04
 RUN apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y -qq \
     ccache \
     cmake \
-    make \
     flake8 \
-    valgrind \
-    python3-pip \
-    python3-opencv \
-    libpython3-dev \
-    pybind11-dev \
-    libfmt-dev \
-    libopencv-dev \
-    libceres-dev \
-    libgtest-dev \
+    git \
+    libboost-filesystem-dev \
     libboost-system-dev \
-    libboost-filesystem-dev
+    libceres-dev \
+    libfmt-dev \
+    libgtest-dev \
+    libopencv-dev \
+    libpython3-dev \
+    make \
+    pybind11-dev \
+    python3-opencv \
+    python3-pip \
+    valgrind
 
 COPY ./requirements.txt /opt/src/mvgkit/requirements.txt
 RUN pip install --upgrade setuptools pip && pip install -r /opt/src/mvgkit/requirements.txt -q

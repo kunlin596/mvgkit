@@ -25,6 +25,12 @@ target_link_libraries(test_geometry Eigen3::Eigen mvgkit_common
                       mvgkit_testing_utils GTest::GTest GTest::Main)
 add_test(mvgkit_testGeometry test_geometry WORKING_DIRECTORY ${TEST_DATA_DIR})
 
+# Transformation
+add_executable(test_transformation test_transformation.cc)
+target_link_libraries(test_transformation Eigen3::Eigen mvgkit_common
+                      mvgkit_testing_utils GTest::GTest GTest::Main)
+add_test(mvgkit_testTransformation test_transformation)
+
 # Fundamental
 add_executable(test_fundamental test_fundamental.cc)
 target_link_libraries(
@@ -51,6 +57,7 @@ target_link_libraries(
   GTest::Main)
 add_test(mvgkit_testTriangulation test_triangulation)
 
+# Essential matrix estimation
 add_executable(test_essential test_essential.cc)
 target_link_libraries(
   test_essential
@@ -62,3 +69,15 @@ target_link_libraries(
   GTest::GTest
   GTest::Main)
 add_test(mvgkit_testEssential test_essential)
+
+# PnP
+add_executable(test_pnp test_pnp.cc)
+target_link_libraries(
+  test_pnp
+  mvgkit_testing_utils
+  mvgkit_common
+  mvgkit_algorithms
+  Eigen3::Eigen
+  GTest::GTest
+  GTest::Main)
+add_test(mvgkit_testPnP test_pnp)

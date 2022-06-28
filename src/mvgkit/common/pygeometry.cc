@@ -27,6 +27,15 @@ add_geometry_module(py::module& m)
       return intersectLines2D(lines.transpose());
     },
     "lines"_a);
+  m.def(
+    "get_barycentric_coords_3d",
+    [](const Eigen::Matrix<double, -1, 3>& referencePoints,
+       const Eigen::Matrix<double, 1, 3>& queryPoint) -> Eigen::Vector<double, -1> {
+      return getBarycentricCoordinates<3, double>(referencePoints.transpose(),
+                                                  queryPoint.transpose());
+    },
+    "referencePoints"_a,
+    "queryPoints"_a);
 }
 
 } // python
