@@ -1,5 +1,5 @@
 #pragma once
-#include "../common/eigen.h"
+#include "eigen.h"
 #include <sophus/se3.hpp>
 
 namespace mvgkit {

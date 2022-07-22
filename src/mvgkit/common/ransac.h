@@ -1,6 +1,6 @@
 #pragma once
 
-#include "../io/json_utils.h"
+#include "json_utils.h"
 #include "random.h"
 #include <Eigen/Dense>
 #include <algorithm>

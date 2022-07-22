@@ -1,34 +1,23 @@
-add_library(mvgkit_common SHARED math.h camera.h camera.cc geometry.h
-                                 geometry.cc ransac.h)
-target_link_libraries(mvgkit_common PUBLIC Eigen3::Eigen Sophus::Sophus
-                                           opencv_core mvgkit_io)
+file(GLOB MVGKIT_COMMON_HEADER_FILES *.h)
+file(GLOB MVGKIT_COMMON_SOURCE_FILES *.cc)
+
+add_library(mvgkit_common SHARED ${MVGKIT_COMMON_HEADER_FILES}
+                                 ${MVGKIT_COMMON_SOURCE_FILES})
+
+target_link_libraries(
+  mvgkit_common PUBLIC Eigen3::Eigen Sophus::Sophus opencv_core
+                       nlohmann_json::nlohmann_json Boost::filesystem fmt::fmt)
+
 install(TARGETS mvgkit_common LIBRARY DESTINATION lib)
 
 # Headers
-set(COMMON_HEADERS
-    eigen.h
-    camera.h
-    geometry.h
-    random.h
-    transformation.h
-    math.h
-    ransac.h)
-install(FILES ${COMMON_HEADERS} DESTINATION include/mvgkit/common)
+install(FILES ${MVGKIT_COMMON_HEADER_FILES} DESTINATION include/mvgkit/common)
 
 # Python bindings
 if(BUILD_PYTHON_BINDINGS)
-  pybind11_add_module(_mvgkit_geometry_cppimpl pygeometry.cc)
-  target_link_libraries(_mvgkit_geometry_cppimpl PRIVATE mvgkit_common)
-  target_compile_definitions(_mvgkit_geometry_cppimpl
-                             PRIVATE VERSION_INFO=${DMVGKIT_VERSION_INFO})
+  pybind11_add_module(pymvgkit_common python/pycommon.cc)
 
-  pybind11_add_module(_mvgkit_camera_cppimpl pycamera.cc)
-  target_link_libraries(_mvgkit_camera_cppimpl PRIVATE mvgkit_common)
-  target_compile_definitions(_mvgkit_camera_cppimpl
-                             PRIVATE VERSION_INFO=${DMVGKIT_VERSION_INFO})
-
-  pybind11_add_module(_mvgkit_transformation_cppimpl pytransformation.cc)
-  target_link_libraries(_mvgkit_transformation_cppimpl PRIVATE mvgkit_common)
-  target_compile_definitions(_mvgkit_transformation_cppimpl
+  target_link_libraries(pymvgkit_common PRIVATE mvgkit_common)
+  target_compile_definitions(pymvgkit_common
                              PRIVATE VERSION_INFO=${DMVGKIT_VERSION_INFO})
 endif()
