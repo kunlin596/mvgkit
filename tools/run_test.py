@@ -42,12 +42,13 @@ def main():
 
     if "all" in options.types or "py" in options.types:
         logger.info("--- MVGKIT: Running Pytest Tests ---")
-        test_path = Path(os.getcwd()).absolute() / "src/tests/python"
+        test_path = Path(os.getcwd()).absolute() / "src/tests"
         command = f"python3 -m pytest {test_path} -v"
         command += " -s" if options.s else ""
         command += f" -n {parallel}" if parallel != 1 else ""
         command += f" -k {options.k}" if options.k else ""
-        subprocess.call(command.split(" "))
+        if subprocess.call(command.split(" ")) != 0:
+            raise RuntimeError("Python testing failed!")
 
     if "all" in options.types or "cpp" in options.types:
         logger.info("--- MVGKIT: Running CMake Tests ---")
@@ -55,7 +56,8 @@ def main():
             Path(os.getcwd()).absolute() / "src" / "tests" / "data"
         )
         os.chdir(options.build_dir)
-        subprocess.call(f"ctest -j{parallel}".split(" "))
+        if subprocess.call(f"ctest -j{parallel}".split(" ")) != 0:
+            raise RuntimeError("C++ testing failed!")
 
 
 if __name__ == "__main__":

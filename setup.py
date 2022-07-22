@@ -3,7 +3,7 @@ import re
 import subprocess
 import sys
 
-from setuptools import Extension, find_packages, setup
+from setuptools import Extension, setup
 from setuptools.command.build_ext import build_ext
 
 # Convert distutils Windows platform specifiers to CMake -A arguments
@@ -120,23 +120,9 @@ class CMakeBuild(build_ext):
 # The information here can also be placed in setup.cfg - better separation of
 # logic and declaration, and simpler if you include description/version in a file.
 setup(
-    name="mvgkit",
-    version="0.0.1",
-    author="Kun Lin",
-    author_email="",
-    description="",
-    long_description="",
-    packages=find_packages(where="src", exclude=["tests", "*.tests", "*.tests.*", "tests.*"]),
-    package_dir={"": "src"},
     ext_modules=[
-        CMakeExtension("_mvgkit_algorithms_cppimpl"),
-        CMakeExtension("_mvgkit_camera_cppimpl"),
-        CMakeExtension("_mvgkit_geometry_cppimpl"),
-        CMakeExtension("_mvgkit_stereo_cppimpl"),
-        CMakeExtension("_mvgkit_transformation_cppimpl"),
+        CMakeExtension("pymvgkit_common"),
+        CMakeExtension("pymvgkit_estimation"),
     ],
     cmdclass={"build_ext": CMakeBuild},
-    zip_safe=False,
-    extras_require={"test": ["pytest>=6.0"]},
-    python_requires=">=3.8",
 )
