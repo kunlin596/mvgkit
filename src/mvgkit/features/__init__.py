@@ -10,6 +10,8 @@ from typing import Dict, List, Optional
 import cv2
 import numpy as np
 
+AVAIBLE_FEATURE_EXTRACTORS = ["ORB", "SIFT"]
+
 
 class ORB:
     _detector = None
