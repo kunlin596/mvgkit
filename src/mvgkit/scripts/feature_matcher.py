@@ -197,8 +197,8 @@ def show(
             label=f"{image_filename1}",
         )
         plt.scatter(
-            keypoints1[:, 0] + image1.shape[1],
-            keypoints1[:, 1],
+            keypoints2[:, 0] + image1.shape[1],
+            keypoints2[:, 1],
             c="r",
             s=1,
             label=f"{image_filename2}",
@@ -222,6 +222,3 @@ def show(
 
 cli.add_command(match)
 cli.add_command(show)
-
-if __name__ == "__main__":
-    cli()
