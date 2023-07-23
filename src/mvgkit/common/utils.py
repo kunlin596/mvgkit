@@ -201,7 +201,6 @@ class SE3:
 
 @dataclass
 class SkewSymmetricMatrix3d:
-
     vec: np.ndarray = np.zeros(3)
 
     def __post_init__(self):
@@ -235,7 +234,6 @@ class SkewSymmetricMatrix3d:
 
 @dataclass
 class PluckerMatrix:
-
     p1: np.ndarray = np.zeros(4)
     p2: np.ndarray = np.zeros(4)
 

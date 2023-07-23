@@ -42,7 +42,6 @@ class _ExecutionState:
 
 
 class MapCreatorWindow(MainWindow):
-
     _image_update_signal = QtCore.Signal()
 
     def __init__(

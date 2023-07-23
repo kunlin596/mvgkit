@@ -22,6 +22,23 @@ option(BUILD_PYTHON_BINDINGS "Build mvgkit Python bindings or not." ON)
 option(USE_EXTERNAL_JSON "Use external json module or not." OFF)
 option(USE_EXTERNAL_SOPHUS "Use external Sophus module or not." OFF)
 option(USE_EXTERNAL_EIGEN "Use external Eigen module or not." ON)
+option(USE_EXTERNAL_GTEST "Use external Gtest module or not." OFF)
+
+if(NOT USE_EXTERNAL_GTEST)
+  message(STATUS "MVGKIT: Will build Gtest from source.")
+  FetchContent_Declare(
+    googletest
+    URL https://github.com/google/googletest/archive/03597a01ee50ed33e9dfd640b249b4be3799d395.zip
+  )
+  # For Windows: Prevent overriding the parent project's compiler/linker
+  # settings
+  set(gtest_force_shared_crt
+      ON
+      CACHE BOOL "" FORCE)
+  FetchContent_MakeAvailable(googletest)
+else()
+  find_package(GTest 1.10 REQUIRED)
+endif()
 
 # Dependencies
 find_package(OpenCV 4.2 REQUIRED)
@@ -59,10 +76,10 @@ else()
 endif()
 
 if(NOT USE_EXTERNAL_SOPHUS)
-  message(STATUS "MVGKIT: Fetching and enabling Sophus release v22.04.1.")
+  message(STATUS "MVGKIT: Fetching and enabling Sophus release 1.22.10.")
   FetchContent_Declare(
     sophus
-    URL https://github.com/strasdat/Sophus/archive/refs/tags/v22.04.1.tar.gz)
+    URL https://github.com/strasdat/Sophus/archive/refs/tags/1.22.10.tar.gz)
   set(BUILD_SOPHUS_EXAMPLES
       OFF
       CACHE INTERNAL "")

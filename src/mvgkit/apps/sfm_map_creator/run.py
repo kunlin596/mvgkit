@@ -9,7 +9,6 @@ from apps.sfm_map_creator.ui import MapCreatorWindow
 from PySide6 import QtWidgets
 
 if __name__ == "__main__":
-
     parser = argparse.ArgumentParser(__doc__)
     parser.add_argument("--input-path", "-i", type=str, required=True, help="Input data path.")
     parser.add_argument("--output-path", "-o", type=str, required=True, help="Output result path.")

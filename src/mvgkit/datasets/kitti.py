@@ -310,7 +310,6 @@ class KittiDrive:
 
 @dataclass
 class KittiCameraCalibration:
-
     unrectified_image_size: np.ndarray
     unrectified_camera_matrix: np.ndarray
     unrectified_distortion_coefficients: np.ndarray

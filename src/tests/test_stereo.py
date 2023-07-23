@@ -3,6 +3,15 @@ from math import sqrt
 
 import numpy as np
 import pytest
+from pymvgkit_common import CameraMatrix, intersect_lines_2d
+from pymvgkit_estimation import (
+    Essential,
+    Fundamental,
+    FundamentalOptions,
+    get_epilines,
+    get_epipole,
+    get_homo_epipole,
+)
 from scipy.spatial.transform import Rotation
 
 from mvgkit.common.log import logger
@@ -12,15 +21,6 @@ from mvgkit.estimation.stereo import (
     Homography2d,
     StereoMatcher,
     StereoRectifier,
-)
-from pymvgkit_common import CameraMatrix, intersect_lines_2d
-from pymvgkit_estimation import (
-    Essential,
-    Fundamental,
-    FundamentalOptions,
-    get_epilines,
-    get_epipole,
-    get_homo_epipole,
 )
 
 np.set_printoptions(suppress=True, precision=15, linewidth=120)
