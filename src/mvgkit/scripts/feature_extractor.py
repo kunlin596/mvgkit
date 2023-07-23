@@ -150,7 +150,3 @@ def show(image_dirpath, feature_dirpath, dump_dirpath, show_mode):
 
 cli.add_command(extract)
 cli.add_command(show)
-
-
-if __name__ == "__main__":
-    cli()

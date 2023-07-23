@@ -119,7 +119,7 @@ class Matcher:
         )
 
         # FIXME
-        dist_threshold = 0.75
+        dist_threshold = 0.9
         query_indices = []
         train_indices = []
         for m, n in matches:

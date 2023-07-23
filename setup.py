@@ -123,5 +123,14 @@ setup(
         CMakeExtension("pymvgkit_common"),
         CMakeExtension("pymvgkit_estimation"),
     ],
-    cmdclass={"build_ext": CMakeBuild},
+    cmdclass={
+        "build_ext": CMakeBuild,
+    },
+    entry_points={
+        "console_scripts": [
+            "mvgkit_run_feature_extraction_pipeline = mvgkit.scripts.feature_extraction_pipeline:cli",
+            "mvgkit_extract_features = mvgkit.scripts.feature_extractor:cli",
+            "mvgkit_match_features = mvgkit.scripts.feature_matcher:cli",
+        ],
+    },
 )
