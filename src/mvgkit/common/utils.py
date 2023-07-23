@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import copyreg
 from dataclasses import dataclass
 from math import sqrt
 from typing import List
@@ -298,3 +299,34 @@ def cv2keypoints_to_nparray(keypoints: list[cv2.KeyPoint]) -> np.ndarray:
 
 def cv2matches_to_nparray(matches: list[cv2.DMatch]) -> np.ndarray:
     return np.array([[m.queryIdx, m.trainIdx] for m in matches])
+
+
+def patch_keypoint_pickle():
+    """
+    This util function is for fixing the pickle issue of cv2.KeyPoint.
+
+    NOTE:
+        C++ constructor
+        KeyPoint(
+            float x,
+            float y,
+            float _size,
+            float _angle=-1,
+            float _response=0,
+            int _octave=0,
+            int _class_id=-1
+        )
+    """
+
+    def _pickle_keypoint(keypoint):
+        return cv2.KeyPoint, (
+            keypoint.pt[0],
+            keypoint.pt[1],
+            keypoint.size,
+            keypoint.angle,
+            keypoint.response,
+            keypoint.octave,
+            keypoint.class_id,
+        )
+
+    copyreg.pickle(cv2.KeyPoint().__class__, _pickle_keypoint)
