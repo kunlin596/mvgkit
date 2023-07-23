@@ -46,8 +46,8 @@ cmake --build build --target install -j16
 ```shell
 python3 -m virtualenv .venv
 source .venv/bin/activate
-python3 -m pip install -r requirements.txt
-python3 -m pip install -e .
+python -m pip install -r requirements.txt
+python setup.py develop
 ```
 
 ## License

@@ -7,6 +7,7 @@ from dataclasses import dataclass
 from math import sqrt
 from typing import List
 
+import cv2
 import numpy as np
 import sympy as sp
 from scipy.spatial.transform import Rotation
@@ -289,3 +290,11 @@ def get_line_points_in_image(line: np.ndarray, width: float, height: float):
     y = (-line[2] - x * line[0]) / line[1]
     isvalid = (0 <= y) & (y < height)
     return np.vstack([x[isvalid], y[isvalid]]).T
+
+
+def cv2keypoints_to_nparray(keypoints: list[cv2.KeyPoint]) -> np.ndarray:
+    return np.array([[kp.pt[0], kp.pt[1]] for kp in keypoints])
+
+
+def cv2matches_to_nparray(matches: list[cv2.DMatch]) -> np.ndarray:
+    return np.array([[m.queryIdx, m.trainIdx] for m in matches])
