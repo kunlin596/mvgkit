@@ -19,7 +19,7 @@ ci:
 repos:
   # Standard hooks
   - repo: https://github.com/pre-commit/pre-commit-hooks
-    rev: v4.2.0
+    rev: v4.4.0
     hooks:
       - id: check-added-large-files
       - id: check-case-conflict
@@ -35,33 +35,33 @@ repos:
 
   # Black, the code formatter, natively supports pre-commit
   - repo: https://github.com/psf/black
-    rev: 22.3.0
+    rev: 23.7.0
     hooks:
       - id: black
         exclude: ^(docs)
 
   # Sort your imports in a standard form
   - repo: https://github.com/PyCQA/isort
-    rev: 5.10.1
+    rev: 5.12.0
     hooks:
       - id: isort
 
   # Upgrade older Python syntax
   - repo: https://github.com/asottile/pyupgrade
-    rev: v2.32.1
+    rev: v3.9.0
     hooks:
       - id: pyupgrade
         args: ["--py36-plus"]
 
   # Changes tabs to spaces
   - repo: https://github.com/Lucas-C/pre-commit-hooks
-    rev: v1.1.13
+    rev: v1.5.1
     hooks:
       - id: remove-tabs
         exclude: ^(docs)
 
-  - repo: https://gitlab.com/pycqa/flake8
-    rev: 3.9.2
+  - repo: https://github.com/pycqa/flake8.git
+    rev: 6.0.0
     hooks:
       - id: flake8
         additional_dependencies: [flake8-bugbear]
@@ -77,7 +77,7 @@ repos:
 
   # Clang format
   - repo: https://github.com/pre-commit/mirrors-clang-format
-    rev: v14.0.3
+    rev: v16.0.6
     hooks:
       - id: clang-format
         types_or: [c++, c, cuda]

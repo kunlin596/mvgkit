@@ -192,7 +192,6 @@ class _ZhangsMethod:
         camera_matrix: CameraMatrix,
         all_extrinsics: List[utils.SE3],
     ) -> np.ndarray:
-
         cx = camera_matrix.cx
         cy = camera_matrix.cy
 
@@ -200,7 +199,6 @@ class _ZhangsMethod:
         D = []
         d = []
         for i, image_points in enumerate(all_image_points):
-
             extrinsics = all_extrinsics[i]
             # xy is the ideal points on normalized image plane
             xy = utils.homogenize(object_points_W) @ extrinsics.as_augmented_matrix().T

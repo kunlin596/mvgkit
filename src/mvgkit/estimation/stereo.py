@@ -9,10 +9,6 @@ from typing import Optional
 
 import cv2
 import numpy as np
-from scipy.optimize import least_squares
-
-from mvgkit.common.utils import SkewSymmetricMatrix3d
-from mvgkit.estimation.homography import Homography2d
 from pymvgkit_estimation import (  # noqa: F401
     EightPoint,
     Essential,
@@ -23,6 +19,10 @@ from pymvgkit_estimation import (  # noqa: F401
     get_epilines,
     get_epipole,
 )
+from scipy.optimize import least_squares
+
+from mvgkit.common.utils import SkewSymmetricMatrix3d
+from mvgkit.estimation.homography import Homography2d
 
 EssentialOptions = FundamentalOptions
 
@@ -105,7 +105,6 @@ class AffinityRecoverySolver:
 
     @staticmethod
     def _solve_one_view(mat1, mat2, image_shape_1, image_shape_2):
-
         A_L, B_L = AffinityRecoverySolver._get_AB(mat1, image_shape_1)
         A_R, B_R = AffinityRecoverySolver._get_AB(mat2, image_shape_2)
 

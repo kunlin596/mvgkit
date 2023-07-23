@@ -1,0 +1,15 @@
+numpy
+opencv-python
+PySide6
+scipy
+tqdm
+pytest
+pytest-xdist
+sympy
+pip-tools
+matplotlib
+open3d
+flake8
+torch
+networkx
+loguru

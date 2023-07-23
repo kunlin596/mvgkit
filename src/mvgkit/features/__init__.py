@@ -120,7 +120,7 @@ class Matcher:
         dist_threshold = 0.75
         query_indices = []
         train_indices = []
-        for (m, n) in matches:
+        for m, n in matches:
             if m.distance < dist_threshold * n.distance:
                 query_indices.append(m.queryIdx)
                 train_indices.append(m.trainIdx)

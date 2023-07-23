@@ -4,11 +4,11 @@ import itertools
 import math
 
 import numpy as np
+from pymvgkit_common import get_barycentric_coords_3d, get_rigid_body_motion
 from scipy.optimize import least_squares
 from scipy.spatial.transform import Rotation
 
 from mvgkit.common.camera import CameraMatrix
-from pymvgkit_common import get_barycentric_coords_3d, get_rigid_body_motion
 
 
 def _compute_control_points(points_W):

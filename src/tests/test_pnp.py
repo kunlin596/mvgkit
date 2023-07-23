@@ -1,10 +1,10 @@
 import numpy as np
 import pytest
+from pymvgkit_estimation import EPnP
 from scipy.spatial.transform import Rotation
 
 from mvgkit.common.camera import CameraMatrix
 from mvgkit.estimation.pnp import solve_epnp
-from pymvgkit_estimation import EPnP
 
 
 @pytest.fixture

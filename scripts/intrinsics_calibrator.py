@@ -29,7 +29,6 @@ def main(*, options):
 
 
 if __name__ == "__main__":
-
     parser = argparse.ArgumentParser(__doc__)
     parser.add_argument(
         "--filename",
