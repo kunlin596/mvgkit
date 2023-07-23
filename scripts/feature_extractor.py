@@ -2,7 +2,6 @@
 """This module implements feature extraction."""
 from __future__ import annotations
 
-import copyreg
 import os
 import pickle
 from pathlib import Path
@@ -15,37 +14,7 @@ import tqdm
 from loguru import logger as log
 
 from mvgkit import features
-
-
-def _patch_keypoint_pickle():
-    """
-    This util function is for fixing the pickle issue of cv2.KeyPoint.
-
-    NOTE:
-        C++ constructor
-        KeyPoint(
-            float x,
-            float y,
-            float _size,
-            float _angle=-1,
-            float _response=0,
-            int _octave=0,
-            int _class_id=-1
-        )
-    """
-
-    def _pickle_keypoint(keypoint):
-        return cv2.KeyPoint, (
-            keypoint.pt[0],
-            keypoint.pt[1],
-            keypoint.size,
-            keypoint.angle,
-            keypoint.response,
-            keypoint.octave,
-            keypoint.class_id,
-        )
-
-    copyreg.pickle(cv2.KeyPoint().__class__, _pickle_keypoint)
+from mvgkit.common.utils import patch_keypoint_pickle
 
 
 @click.group()
@@ -77,7 +46,7 @@ def cli():
     help="feature type",
 )
 def extract(input_dirpath: str, output_dirpath: str, feature_type: str):
-    _patch_keypoint_pickle()
+    patch_keypoint_pickle()
 
     feature_cls = getattr(features, feature_type)
     extractor = feature_cls()
