@@ -45,9 +45,14 @@ def main():
         test_path = Path(os.getcwd()).absolute() / "src/tests"
         command = f"python3 -m pytest {test_path} -v"
         command += " -s" if options.s else ""
-        command += f" -n {parallel}" if parallel != 1 else ""
+        # Disable setuptools-entrypoint plugin autoloading so that unrelated,
+        # broken third-party pytest plugins (e.g. `dash`, pulled in transitively
+        # and importing the removed `pkg_resources`) cannot crash collection.
+        # Load `xdist` explicitly when running in parallel.
+        env = {**os.environ, "PYTEST_DISABLE_PLUGIN_AUTOLOAD": "1"}
+        command += f" -p xdist -n {parallel}" if parallel != 1 else ""
         command += f" -k {options.k}" if options.k else ""
-        if subprocess.call(command.split(" ")) != 0:
+        if subprocess.call(command.split(" "), env=env) != 0:
             raise RuntimeError("Python testing failed!")
 
     if "all" in options.types or "cpp" in options.types:
