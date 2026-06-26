@@ -31,8 +31,13 @@ python3-opencv \
 libpython3-dev \
 pybind11-dev \
 libfmt-dev \
+libeigen3-dev \
 libopencv-dev \
-libceres-dev \
 libgtest-dev \
 libboost-system-dev \
 libboost-filesystem-dev
+
+# NOTE: libceres-dev is intentionally omitted. On the GitHub ubuntu-22.04
+# runner it pulls libgoogle-glog-dev, whose libunwind-dev dependency is not
+# installable, which breaks the whole step. The build fetches Ceres from source
+# instead (see the Ceres FetchContent fallback in the root CMakeLists.txt).

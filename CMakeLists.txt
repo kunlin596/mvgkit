@@ -79,6 +79,18 @@ if(NOT Ceres_FOUND)
   set(BUILD_BENCHMARKS
       OFF
       CACHE INTERNAL "")
+  # Use Ceres' bundled miniglog so the source build needs neither glog nor its
+  # libunwind dependency (libgoogle-glog-dev is uninstallable on some CI
+  # runners, which is exactly why we fall back to fetching Ceres).
+  set(MINIGLOG
+      ON
+      CACHE INTERNAL "")
+  # mvgkit does not use the CUDA solvers; disabling CUDA keeps the source build
+  # deterministic and avoids enable_language(CUDA) failing on hosts that have a
+  # partial CUDA toolkit.
+  set(USE_CUDA
+      OFF
+      CACHE INTERNAL "")
   FetchContent_Declare(
     ceres
     URL https://github.com/ceres-solver/ceres-solver/archive/refs/tags/2.2.0.tar.gz
