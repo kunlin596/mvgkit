@@ -12,6 +12,10 @@
 #
 # See https://github.com/pre-commit/pre-commit
 
+# Install both the file-formatting hooks and the commit-message hook with a
+# single `pre-commit install --install-hooks`.
+default_install_hook_types: [pre-commit, commit-msg]
+
 ci:
   autoupdate_commit_msg: "chore: update pre-commit hooks"
   autofix_commit_msg: "style: pre-commit fixes"
@@ -51,7 +55,7 @@ repos:
     rev: v3.9.0
     hooks:
       - id: pyupgrade
-        args: ["--py36-plus"]
+        args: ["--py310-plus"]
 
   # Changes tabs to spaces
   - repo: https://github.com/Lucas-C/pre-commit-hooks
@@ -81,3 +85,25 @@ repos:
     hooks:
       - id: clang-format
         types_or: [c++, c, cuda]
+
+  # Enforce Conventional Commits with a mandatory scope, e.g.
+  # `feat(estimation): add EPnP refinement`. `--force-scope` rejects messages
+  # such as `feat: ...` that omit the `(scope)`.
+  - repo: https://github.com/compilerla/conventional-pre-commit
+    rev: v4.4.0
+    hooks:
+      - id: conventional-pre-commit
+        stages: [commit-msg]
+        args:
+          - --force-scope
+          - feat
+          - fix
+          - docs
+          - refactor
+          - test
+          - chore
+          - perf
+          - ci
+          - style
+          - build
+          - revert
