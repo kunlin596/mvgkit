@@ -8,7 +8,14 @@ include(CTest)
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
-set(CMAKE_CXX_COMPILER_LAUNCHER ccache)
+
+# Use ccache to speed up rebuilds only when it is actually installed. Hardcoding
+# it would break the build on machines without ccache.
+find_program(CCACHE_PROGRAM ccache)
+if(CCACHE_PROGRAM)
+  message(STATUS "MVGKIT: Using ccache at ${CCACHE_PROGRAM}.")
+  set(CMAKE_CXX_COMPILER_LAUNCHER ${CCACHE_PROGRAM})
+endif()
 
 #
 # Options
@@ -42,12 +49,44 @@ endif()
 
 # Dependencies
 find_package(OpenCV 4.2 REQUIRED)
-find_package(fmt REQUIRED)
-find_package(Ceres REQUIRED)
 find_package(
   Boost
   COMPONENTS filesystem
   REQUIRED)
+
+# fmt: prefer a system install, fall back to fetching from source.
+find_package(fmt QUIET)
+if(NOT fmt_FOUND)
+  message(STATUS "MVGKIT: fmt not found, fetching release 10.1.1 from source.")
+  FetchContent_Declare(
+    fmt URL https://github.com/fmtlib/fmt/archive/refs/tags/10.1.1.tar.gz)
+  FetchContent_MakeAvailable(fmt)
+else()
+  message(STATUS "MVGKIT: Found system fmt ${fmt_VERSION}.")
+endif()
+
+# Ceres: prefer a system install, fall back to fetching from source. Both paths
+# expose the `Ceres::ceres` imported target.
+find_package(Ceres QUIET)
+if(NOT Ceres_FOUND)
+  message(STATUS "MVGKIT: Ceres not found, fetching release 2.2.0 from source.")
+  set(BUILD_TESTING
+      OFF
+      CACHE INTERNAL "")
+  set(BUILD_EXAMPLES
+      OFF
+      CACHE INTERNAL "")
+  set(BUILD_BENCHMARKS
+      OFF
+      CACHE INTERNAL "")
+  FetchContent_Declare(
+    ceres
+    URL https://github.com/ceres-solver/ceres-solver/archive/refs/tags/2.2.0.tar.gz
+  )
+  FetchContent_MakeAvailable(ceres)
+else()
+  message(STATUS "MVGKIT: Found system Ceres ${Ceres_VERSION}.")
+endif()
 
 # Somehow opencv cannot find the includes...
 include_directories(${OpenCV_INCLUDE_DIRS})
@@ -99,12 +138,14 @@ endif()
 add_subdirectory(src)
 
 # Tests
+#
+# GTest is already provided above: fetched from source by default, or via
+# `find_package(GTest)` when USE_EXTERNAL_GTEST=ON. Either way the
+# `GTest::gtest` / `GTest::gtest_main` targets are available here, so we must
+# not call `find_package(GTest REQUIRED)` again (that would force a system
+# install even when GTest was fetched).
 if(BUILD_MVGKIT_TESTS)
   message(STATUS "Will build mvgkit cpp tests.")
-  find_package(GTest 1.10 REQUIRED)
-  if(GTest_FOUND)
-    enable_testing()
-    add_subdirectory(src/tests)
-    message(STATUS "Found GTest version: [${GTest_VERSION}].")
-  endif()
+  enable_testing()
+  add_subdirectory(src/tests)
 endif()

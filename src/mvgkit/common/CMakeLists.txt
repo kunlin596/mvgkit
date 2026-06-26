@@ -19,5 +19,9 @@ if(BUILD_PYTHON_BINDINGS)
 
   target_link_libraries(pymvgkit_common PRIVATE mvgkit_common)
   target_compile_definitions(pymvgkit_common
-                             PRIVATE VERSION_INFO=${DMVGKIT_VERSION_INFO})
+                             PRIVATE VERSION_INFO=${MVGKIT_VERSION_INFO})
+  # Find the co-located mvgkit shared libraries at import time without needing a
+  # system-wide install or LD_LIBRARY_PATH (`$ORIGIN` is the module's own dir).
+  set_target_properties(pymvgkit_common PROPERTIES BUILD_RPATH "$ORIGIN"
+                                                   INSTALL_RPATH "$ORIGIN")
 endif()

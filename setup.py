@@ -1,5 +1,7 @@
+import glob
 import os
 import re
+import shutil
 import subprocess
 import sys
 
@@ -42,7 +44,8 @@ class CMakeBuild(build_ext):
         # EXAMPLE_VERSION_INFO shows you how to pass a value into the C++ code
         # from Python.
         cmake_args = [
-            "-DCMAKE_CXX_COMPILER_LAUNCHER=ccache",
+            # ccache is enabled by CMakeLists.txt when present; don't force it
+            # here, or the build breaks on machines without ccache installed.
             f"-DCMAKE_LIBRARY_OUTPUT_DIRECTORY={extdir}",
             f"-DPYTHON_EXECUTABLE={sys.executable}",
             f"-DCMAKE_BUILD_TYPE={cfg}",  # not used on MSVC, but no harm
@@ -114,6 +117,31 @@ class CMakeBuild(build_ext):
         build_cmd = ["cmake", "--build", ".", f"-j{os.cpu_count()}", "--target", ext.name]
         build_cmd += build_args
         subprocess.check_call(build_cmd, cwd=build_temp)
+
+        self._colocate_dependent_libraries(ext, extdir)
+
+    def _colocate_dependent_libraries(self, ext, extdir):
+        """Copy the mvgkit C++ shared libraries next to the built extension.
+
+        The extension is linked against ``libmvgkit_*.so`` and its RPATH
+        contains ``$ORIGIN``, so co-locating those libraries lets the module be
+        imported without a system-wide install or ``LD_LIBRARY_PATH``. CMake
+        emits the libraries into ``extdir`` (the build-lib directory); also
+        mirror them into the in-tree package directory so editable installs,
+        whose modules are copied back to the source tree, stay self-contained.
+        """
+        dependent_libs = glob.glob(os.path.join(extdir, "libmvgkit_*.so"))
+        build_py = self.get_finalized_command("build_py")
+        dest_dirs = {
+            os.path.dirname(self.get_ext_fullpath(ext.name)),
+            os.path.abspath(build_py.get_package_dir("")),
+        }
+        for dest in dest_dirs:
+            os.makedirs(dest, exist_ok=True)
+            for lib in dependent_libs:
+                target = os.path.join(dest, os.path.basename(lib))
+                if os.path.abspath(lib) != os.path.abspath(target):
+                    shutil.copy2(lib, target)
 
 
 # The information here can also be placed in setup.cfg - better separation of
