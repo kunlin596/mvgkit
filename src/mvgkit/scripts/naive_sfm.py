@@ -5,8 +5,8 @@ import os
 import uuid
 from pathlib import Path
 
-from mvgkit.mapping.mapper import sfm
-from mvgkit.models import kitti
+from mvgkit.datasets import kitti
+from mvgkit.mapping import sfm
 from mvgkit.streamer import ImageFileStreamer
 
 

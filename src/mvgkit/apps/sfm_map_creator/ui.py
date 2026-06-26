@@ -16,8 +16,8 @@ from pyvistaqt import MainWindow, QtInteractor
 
 from mvgkit import streamer
 from mvgkit.common.utils import SE3
-from mvgkit.mapping.mapper.mapper_manager import AvailableMapperType, MapperManager
-from mvgkit.models import kitti
+from mvgkit.datasets import kitti
+from mvgkit.mapping.mapper_manager import AvailableMapperType, MapperManager
 
 
 def _plot_pose(plotter, pose: SE3):

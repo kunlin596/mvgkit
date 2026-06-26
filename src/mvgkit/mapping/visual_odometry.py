@@ -3,19 +3,24 @@
 import uuid
 from dataclasses import dataclass
 from enum import IntEnum
-from typing import Optional
 
 import cv2
 import numpy as np
 from scipy.spatial import KDTree
 from scipy.spatial.transform import Rotation
 
-from mvgkit.algorithms.optical_flow import OpticalFlowLK
 from mvgkit.common.utils import SE3
+from mvgkit.estimation.stereo import Fundamental
 from mvgkit.features import Matcher
-from mvgkit.mapping.common.frame import Frame
-from mvgkit.mapping.common.reconstruction import Landmark, Reconstruction
-from mvgkit.stereo import Fundamental, decompose_essential_matrix, triangulate
+from mvgkit.mapping.frame import Frame
+from mvgkit.mapping.reconstruction import Landmark, Reconstruction
+from mvgkit.tracking.optical_flow import OpticalFlowLK
+
+# FIXME: The free functions `decompose_essential_matrix` and `triangulate` were
+# removed in the refactor (#88). They are now the C++ `Essential` class
+# (`get_pose_RL`, `get_points3d_L`) and `Triangulation` static methods. The
+# visual-odometry pipeline below still calls the old API and must be migrated to
+# the new one before it is usable.
 
 
 def _keypoints_to_ndarray(keypoints):
@@ -55,7 +60,7 @@ class VisualOdometry:
         Normal = 2
         Failed = 3
 
-    def __init__(self, params: Optional[Parameters] = None):
+    def __init__(self, params: Parameters | None = None):
         if params is None:
             # TODO: add parameters
             pass
@@ -91,7 +96,7 @@ class VisualOdometry:
         best_points3d_L = None
         best_inlier_mask = None
         for i, P2 in enumerate(P2_candidates):
-            points3d_L = triangulate(P1, P2, image_points_L, image_points_R)
+            points3d_L = triangulate(P1, P2, image_points_L, image_points_R)  # noqa: F821
             # FIXME: determine min depth correctly.
             inlier_mask = points3d_L[:, 2] > 1.0
             num_valid_points = np.count_nonzero(inlier_mask)
@@ -121,7 +126,7 @@ class VisualOdometry:
             x_L=matched_points_R, x_R=matched_points_C
         )
         E_CR = frame_R.camera.K.as_matrix().T @ F_CR @ frame_C.camera.K.as_matrix()
-        R1_CR, R2_CR, t_C = decompose_essential_matrix(E_RL=E_CR)
+        R1_CR, R2_CR, t_C = decompose_essential_matrix(E_RL=E_CR)  # noqa: F821
 
         rel_pose_CR, points3d_R, inlier_mask_R = VisualOdometry._disambiguate_camera_pose(
             R1_RL=R1_CR,
@@ -166,7 +171,7 @@ class VisualOdometry:
         object_points: np.ndarray,
         image_points: np.ndarray,
         camera_matrix: np.ndarray,
-        dist_coeffs: Optional[np.ndarray] = None,
+        dist_coeffs: np.ndarray | None = None,
     ):
         """Solve for the transformation from world frame to camera frame."""
 
@@ -304,7 +309,7 @@ class VisualOdometry:
         keypoints_R = keypoints_R[flow_mask]
         keypoints_C = keypoints_C[flow_mask]
 
-        new_points3d_R = triangulate(P_R, P_C, keypoints_R, keypoints_C)
+        new_points3d_R = triangulate(P_R, P_C, keypoints_R, keypoints_C)  # noqa: F821
         is_in_range = VisualOdometry._get_points3d_range_mask(new_points3d_R)
         new_points3d_R = new_points3d_R[is_in_range]
         frame_R.points3d = new_points3d_R

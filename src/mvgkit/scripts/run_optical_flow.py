@@ -10,7 +10,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 from mvgkit import features
-from mvgkit.algorithms import optical_flow
+from mvgkit.tracking import optical_flow
 
 
 def _main(path: Path):

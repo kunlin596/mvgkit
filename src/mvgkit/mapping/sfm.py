@@ -3,13 +3,12 @@
 import threading
 import uuid
 from dataclasses import dataclass
-from typing import Dict, Optional
 
 import numpy as np
 
 from mvgkit import features, streamer
 from mvgkit.common.camera import Camera
-from mvgkit.mapping.common import frame, reconstruction, visual_odometry
+from mvgkit.mapping import frame, reconstruction, visual_odometry
 
 
 class IncrementalSFM:
@@ -28,8 +27,8 @@ class IncrementalSFM:
         self,
         *,
         streamer: streamer.StreamerBase,
-        camera: Optional[Camera] = None,
-        params: Optional[Dict] = None,
+        camera: Camera | None = None,
+        params: dict | None = None,
     ):
         """
         Args:
@@ -114,7 +113,7 @@ class IncrementalSFM:
         )
 
         if not succeeded:
-            False
+            return False
 
         self.state.frame_count += 1
         return True

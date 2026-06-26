@@ -37,14 +37,14 @@ import zipfile
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
-from typing import Dict, List
 
 import cv2
 import numpy as np
 import tqdm
 from scipy.spatial.transform import Rotation
 
-from mvgkit import camera, image_processing, utils
+from mvgkit import image_processing
+from mvgkit.common import camera, utils
 
 
 @dataclass
@@ -284,14 +284,14 @@ class KittiDrive:
             datalist.append(data_cls(*data, self._timestamps[data_id][i]))
         return datalist
 
-    def read_image(self, camera_id: int, indices: List[int], data_type: str = "sync"):
+    def read_image(self, camera_id: int, indices: list[int], data_type: str = "sync"):
         data_id = f"image_{camera_id:02d}"
         images = self._read_data(
             self._path / data_type, data_id, self._read_image, KittiImage, indices
         )
         return images
 
-    def read_lidar_scan(self, indices: List[int], data_type: str = "sync"):
+    def read_lidar_scan(self, indices: list[int], data_type: str = "sync"):
         scan = self._read_data(
             self._path / data_type,
             "velodyne_points",
@@ -301,7 +301,7 @@ class KittiDrive:
         )
         return scan
 
-    def read_imu_measurements(self, indices: List[int], data_type: str = "sync"):
+    def read_imu_measurements(self, indices: list[int], data_type: str = "sync"):
         imu_measurements = self._read_data(
             self._path / data_type, "oxts", self._read_imu_measurements, IMUMeasurements, indices
         )
@@ -354,7 +354,7 @@ class KittiStereoCalibration:
 
     timestamp: float
     corner_dist: float
-    calibrations: Dict[int, KittiCameraCalibration]
+    calibrations: dict[int, KittiCameraCalibration]
 
 
 @dataclass

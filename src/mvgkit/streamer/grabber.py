@@ -6,9 +6,7 @@ import time
 
 import cv2
 
-from mvgkit.log import get_logger
-
-log = get_logger(logger_name=__name__)
+from mvgkit.common.log import logger as log
 
 
 class SimpleGrabber:

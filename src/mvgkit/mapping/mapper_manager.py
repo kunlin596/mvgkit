@@ -1,8 +1,7 @@
 from enum import IntEnum
-from typing import Dict, Optional
 
 from mvgkit.common.camera import Camera
-from mvgkit.mapping.mapper import sfm
+from mvgkit.mapping import sfm
 from mvgkit.streamer import StreamerBase
 
 
@@ -15,8 +14,8 @@ class MapperManager:
     def create_mapper(
         mapper_type: AvailableMapperType,
         streamer: StreamerBase,
-        camera: Optional[Camera] = None,
-        params: Optional[Dict] = None,
+        camera: Camera | None = None,
+        params: dict | None = None,
     ):
         """
         TODO: add custom configuration from input arguments for each mapper class.

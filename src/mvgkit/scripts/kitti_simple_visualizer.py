@@ -3,15 +3,14 @@
 """
 import argparse
 from pathlib import Path
-from typing import List
 
 import matplotlib.pyplot as plt
 import numpy as np
 import pyvista as pv
 
+from mvgkit.datasets import kitti
+from mvgkit.estimation.stereo import Fundamental
 from mvgkit.features import SIFT, Matcher
-from mvgkit.models import kitti
-from mvgkit.stereo import Fundamental
 
 np.set_printoptions(suppress=True, precision=7, linewidth=120)
 
@@ -71,7 +70,7 @@ def _project_points_to_image(points, P):
 
 def _plot_overlay(
     images,
-    camera_calibrations: List[kitti.KittiCameraCalibration],
+    camera_calibrations: list[kitti.KittiCameraCalibration],
     lidar_scan,
     lidar_calibration,
 ):

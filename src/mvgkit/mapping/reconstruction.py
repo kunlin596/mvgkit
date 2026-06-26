@@ -1,13 +1,12 @@
 import uuid
 from dataclasses import dataclass
 from pathlib import Path
-from typing import List, Optional
 
 import numpy as np
 import plyfile
 
 from mvgkit.common.utils import SE3
-from mvgkit.mapping.common.frame import Frame
+from mvgkit.mapping.frame import Frame
 
 
 @dataclass
@@ -16,15 +15,15 @@ class Landmark:
     pose_G: SE3
     descriptor: np.ndarray
     frame_id: uuid.UUID
-    num_matches: Optional[int] = -1  # TODO
-    num_observations: Optional[int] = -1  # TODO
+    num_matches: int | None = -1  # TODO
+    num_observations: int | None = -1  # TODO
 
 
 class Reconstruction:
     def __init__(self):
         # TODO: Use pandas.DataFrame
-        self._landmarks_G: List[Landmark] = list()
-        self._frames: List[Frame] = list()
+        self._landmarks_G: list[Landmark] = list()
+        self._frames: list[Frame] = list()
 
     def add_frame(self, frame: Frame):
         self._frames.append(frame)
@@ -32,7 +31,7 @@ class Reconstruction:
     def add_landmark_G(self, landmark: Landmark):
         self._landmarks_G.append(landmark)
 
-    def extend_landmarks_G(self, new_landmarks_G: List[Landmark]):
+    def extend_landmarks_G(self, new_landmarks_G: list[Landmark]):
         self._landmarks_G.extend(new_landmarks_G)
 
     def get_descriptors(self):
