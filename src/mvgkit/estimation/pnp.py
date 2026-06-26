@@ -4,11 +4,11 @@ import itertools
 import math
 
 import numpy as np
-from pymvgkit_common import get_barycentric_coords_3d, get_rigid_body_motion
 from scipy.optimize import least_squares
 from scipy.spatial.transform import Rotation
 
 from mvgkit.common.camera import CameraMatrix
+from pymvgkit_common import get_barycentric_coords_3d, get_rigid_body_motion
 
 
 def _compute_control_points(points_W):
@@ -63,8 +63,6 @@ def _get_beta_1(L, rho):
     betas[1] = x[1] / betas[0]
     betas[2] = x[2] / betas[0]
     betas[3] = x[3] / betas[0]
-    print("x", x)
-    print("betas ", betas)
     return betas
 
 
@@ -85,8 +83,6 @@ def _get_beta_2(L, rho):
         betas[1] = math.sqrt(x[2]) if x[2] > 0.0 else 0.0
     if x[1] < 0.0:
         betas[0] = -betas[0]
-    print("x", x)
-    print("betas ", betas)
     return betas
 
 
@@ -109,8 +105,6 @@ def _get_beta_3(L, rho):
         betas[0] = -betas[0]
     betas[2] = x[2] / betas[0]
     betas[3] = 0.0
-    print("x", x)
-    print("betas ", betas)
     return betas
 
 

@@ -123,8 +123,9 @@ private:
       ++iter;
     }
 
-    // FIXME: Temporary terminating condition.
-    return _inlierIndices.size() <= 0;
+    // Report success when at least one inlier was found. (Previously this
+    // returned the inverted condition, i.e. `true` on failure.)
+    return !_inlierIndices.empty();
   }
 
   EstimatorType _estimator;
